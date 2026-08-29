@@ -2,6 +2,9 @@
 """
 Chasse aux proprietes et actions CACHEES du robot EZVIZ.
 
+Cette version affiche chaque requete au fur et a mesure : un balayage muet ne
+permet pas de distinguer un script qui travaille d'un script bloque.
+
 Constat : ecrire taskState sur CurrentTask renvoie 200 mais le robot ne bouge
 pas. CurrentTask est declaree 'rwu' - le 'u' pour upload : l'appareil REMONTE
 cette propriete. Y ecrire met a jour le cache du cloud, sans rien commander.
@@ -133,7 +136,8 @@ def main() -> None:
     client.login()
     print(f"\nConnexion OK - cible : {serial}")
     print(f"{len(DOMAINS)} domaines x {len(NAMES)} noms, sur deux routes.")
-    print("Seules les trouvailles sont affichees. Compter quelques minutes.\n")
+    print("Chaque ligne est une requete. Les trouvailles sont signalees par")
+    print("<<< TROUVE en bout de ligne.\n")
 
     force = phase_force_check(client, serial)
 
@@ -144,8 +148,13 @@ def main() -> None:
     found: list[dict] = []
     tally: dict[str, int] = {}
 
+    total = len(DOMAINS) * len(NAMES)
+    done = 0
+    started = time.time()
+
     for domain in DOMAINS:
         for name in NAMES:
+            verdicts = []
             for route, fn in (
                 ("feature", client.set_iot_feature),
                 ("action", client.set_iot_action),
@@ -157,16 +166,27 @@ def main() -> None:
                     detail = str(err)
                     verdict = classify(detail)
 
+                verdicts.append(verdict)
                 tally[verdict] = tally.get(verdict, 0) + 1
                 if verdict in ("TROUVE", "ACCEPTE", "autre"):
-                    print(f"  [{verdict}] {route} / {domain} / {name}")
-                    print(f"      {detail[:400]}")
                     found.append({
                         "route": route, "domain": domain, "name": name,
                         "verdict": verdict, "detail": detail[:6000],
                     })
-            time.sleep(0.03)
-        print(f"  ... {domain} termine")
+
+            done += 1
+            rate = done / max(time.time() - started, 0.001)
+            eta = int((total - done) / rate) if rate else 0
+            flag = "  <<< TROUVE" if "TROUVE" in verdicts or "ACCEPTE" in verdicts else ""
+            print(
+                f"  [{done:3}/{total}] {domain}.{name:<20} "
+                f"{'/'.join(verdicts):<24} reste ~{eta // 60}m{eta % 60:02}s{flag}",
+                flush=True,
+            )
+            if flag:
+                for entry in found[-2:]:
+                    if entry["verdict"] in ("TROUVE", "ACCEPTE"):
+                        print(f"        {entry['detail'][:500]}", flush=True)
 
     with open(OUTFILE, "w", encoding="utf-8") as fh:
         json.dump({"forceCheck": force, "tally": tally, "found": found},
