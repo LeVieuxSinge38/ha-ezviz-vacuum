@@ -72,9 +72,9 @@ authentification n'est pas encore prise en charge.
 - **Une seule carte à la fois.** Le robot ne travaille que sur sa carte
   active ; demander des pièces d'un autre étage échoue avec un message
   explicite plutôt que de nettoyer à moitié.
-- **Les noms de pièces ne remontent pas toujours.** `RoomBasicProperty`
-  renvoie parfois autre chose que le tableau attendu ; les pièces s'appellent
-  alors « Pièce 3 ». Sans conséquence : c'est l'association aux zones Home
+- **Les pièces s'appellent « Pièce N ».** `RoomBasicProperty`, seule
+  propriété censée porter les noms, renvoie `true` au lieu de son tableau sur
+  ce firmware. Sans conséquence pratique : c'est l'association aux zones Home
   Assistant qui leur donne leur vrai nom.
 - **Pas de carte affichable.** Les contours ne sont pas exposés par cette
   API ; seuls les noms et identifiants des pièces le sont.
@@ -309,15 +309,22 @@ vrais capteurs de diagnostic.
 
 Tout est en écriture. Trois propriétés à combiner.
 
-**`SweeperMapMgr.RoomBasicProperty`** (`rw`) — l'annuaire des pièces, avec
-leurs noms. À lire pour nommer les zones côté Home Assistant.
+**`SweeperMapMgr.RoomBasicProperty`** — annonce ce schéma :
 
 ```
 [{ mapID, room: [{ roomID, roomName, backgroundColor }] }]
 ```
 
-⚠️ `FEATURE_INFO` la réduit à `true` ; il faut passer par
-`get_device_feature_value()` pour obtenir le tableau réel.
+⚠️ **mais ne renvoie jamais ce tableau.** Sur le RE5 Plus (firmware
+V0.01.92), une lecture directe répond `code 200` avec la donnée `true` — un
+simple drapeau de capacité, pas un porteur de données. `FEATURE_INFO` montre
+la même chose. **Les noms de pièces ne sont pas récupérables par cette
+propriété** ; inutile d'insister.
+
+Les identifiants de pièces viennent donc de `RoomCustomCleanCfg`, qui, elle,
+renvoie bien son tableau. Les segments exposés à Home Assistant s'appellent
+« Pièce N » — sans conséquence, puisque l'association aux zones leur donne
+leur vrai nom.
 
 **`SweeperMapMgr.RoomCustomCleanCfg`** (`rw`) — le réglage par pièce.
 
