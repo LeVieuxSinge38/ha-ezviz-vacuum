@@ -29,8 +29,8 @@ que les robots y exposent aussi leurs commandes.
       bien les valeurs en direct (batterie, état de la tâche)
 - [x] **Étape 1b — Vocabulaire d'état** : capturé en observant le robot piloté
       depuis l'app (voir *États observés*). Manque l'état de retour à la base.
-- [ ] **Étape 1c — Écriture** : trouver comment commander (le chemin est
-      probablement `SweeperTaskMgr/CurrentTask` en `PUT`)
+- [x] **Étape 1c — Écriture** : mécanisme trouvé et validé (voir *Commander
+      le robot*)
 - [ ] **Étape 2 — Validation** : confirmer qu'écrire une clé fait réagir le robot
 - [ ] **Étape 3 — Intégration** : entité `vacuum` (start / pause / stop /
       return_to_base / batterie / puissance d'aspiration)
@@ -114,6 +114,68 @@ Autres observations pendant un cycle :
 - `CurrentTask.exception` est resté vide même quand le robot s'est retrouvé
   bloqué par un objet et soulevé — ce champ ne semble pas remonter les
   incidents physiques
+
+## Commander le robot
+
+`SweeperTaskMgr.CurrentTask` est déclaré `access=rwu` — inscriptible. On
+commande le robot en y écrivant un `taskState` :
+
+```python
+client.set_iot_feature(
+    "BD1522206", "SweepingRobot", "0",
+    "SweeperTaskMgr", "CurrentTask",
+    {"taskState": "clean"},
+)
+```
+
+Valeurs acceptées, extraites de l'énumération du schéma :
+
+| `taskState` | Libellé d'origine | Usage |
+|---|---|---|
+| `standby` | 休息中 | au repos |
+| `clean` | 清洁中 | **démarrer le nettoyage** |
+| `cleanPause` | 清洁暂停中 | **mettre en pause** |
+| `cleanDoneRecharge` | 清洁完成回充 | **retour à la base** |
+| `dryingMop` | 烘干拖布中 | séchage de la serpillère |
+| `inspect` / `inspectPause` / `inspectDoneRecharge` | 巡检… | patrouille |
+| `remoteControl` | 遥控中 | pilotage manuel |
+| `fixedMotion` | 定点移动中 | déplacement ponctuel |
+| `continueCharging` | 电量低补电中 | recharge batterie faible |
+
+Ce qui ne marche **pas** :
+
+- `/v3/iot-feature/action/…` → `设备功能未报备` (« fonction non déclarée »).
+  Tout passe par `feature`, jamais par `action`.
+- `set_device_feature_by_key()` → `itemKey不存在`. Cette route attend une clé
+  plate façon ampoule (`light_switch`), que le robot n'expose pas. Utiliser
+  `set_iot_feature()`.
+- Envelopper la valeur d'un scalaire dans un objet →
+  `$: object found, integer expected`. Pour `PromptToneVolume` on envoie `80`,
+  pas `{"PromptToneVolume": 80}`. Pour `CurrentTask`, qui est de type objet,
+  on envoie bien `{"taskState": …}`.
+
+## La fuite de schéma
+
+Écrire une valeur **invalide** sur une propriété inscriptible fait renvoyer par
+l'API le **schéma JSON complet** de cette propriété : types, bornes,
+énumérations et libellés. C'est la meilleure documentation disponible sur cet
+appareil, et elle vient du serveur lui-même.
+
+Une valeur trop longue (`"Z" * 300`) est invalide pour tous les types — chaîne
+au-delà de `maxLength`, mauvais type pour un entier, un objet ou un tableau.
+Elle ne peut donc jamais être écrite, ce qui en fait une sonde sûre.
+
+Trois réponses distinctes, à savoir lire :
+
+| Réponse | Signification |
+|---|---|
+| schéma détaillé + erreur de validation | propriété inscriptible, valeur refusée |
+| `设备不支持该功能` | la propriété n'existe pas sur cet appareil |
+| `设备功能未报备` | fonction non déclarée sur cette route |
+
+Le schéma de `CurrentTask` contient aussi l'énumération complète des pannes
+(`CR_LidarInitErr`, `CR_MopInstallErr`, `CR_DockDryFanStall`…), matière à de
+vrais capteurs de diagnostic.
 
 ### Actions — point ouvert
 
@@ -217,6 +279,16 @@ de l'erreur distingue « chemin non inscriptible » de « valeur refusée ».
 
 ```bash
 python3 tools/ezviz_write_test.py [SERIAL]
+```
+
+### `tools/ezviz_command.py`
+
+Exploite la fuite de schéma pour cartographier tout le robot (phase 1, sans
+effet), puis envoie les vraies commandes une par une, chacune confirmée au
+clavier (phase 2).
+
+```bash
+python3 tools/ezviz_command.py [SERIAL]
 ```
 
 ### `tools/ezviz_try_action.py`
