@@ -118,8 +118,23 @@ Autres observations pendant un cycle :
 
 ## Commander le robot
 
-`SweeperTaskMgr.CurrentTask` est déclaré `access=rwu` — inscriptible. On
-commande le robot en y écrivant un `taskState` :
+> ⚠️ **`CurrentTask` est un miroir d'état, pas une commande.** Y écrire
+> renvoie `200` et le robot ne bouge pas. Pire : l'écriture **remplace l'objet
+> entier** dans le cache du cloud — après un envoi de `{"taskState": …}`, la
+> relecture ne renvoie plus que ce seul champ, `inCharging`, `exception`,
+> `datetime` et `ID` ayant disparu. On écrase la copie que le cloud garde de
+> l'appareil ; le robot n'en sait rien. Le `u` de `access=rwu` signifie sans
+> doute *upload* : c'est l'appareil qui remonte cette propriété.
+>
+> Le cache se répare seul, l'appareil republiant son état toutes les ~4 s.
+>
+> La vraie commande est ailleurs. Piste en cours : une propriété en **écriture
+> seule**, invisible dans `FEATURE_INFO` qui ne liste que le lisible ; et le
+> drapeau `forceCheck` aperçu dans le `PropertyRequest`.
+
+Le mécanisme d'écriture lui-même est validé (réécriture du volume sonore à
+l'identique → `200`, valeur inchangée). Ce qui suit reste donc exact sur la
+forme, seule la cible est à trouver :
 
 ```python
 client.set_iot_feature(

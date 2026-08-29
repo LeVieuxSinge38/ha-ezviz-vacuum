@@ -76,6 +76,43 @@ NAMES = [
 ]
 
 
+def raw_put(client, path, value, **params):
+    """PUT brut, pour essayer des parametres que la lib n'expose pas."""
+    r = client._session.put(
+        client._url(path), params=params or None, json=value, timeout=25
+    )
+    return r.status_code, r.text
+
+
+def phase_force_check(client, serial) -> list[dict]:
+    """Le champ forceCheck du PropertyRequest force peut-etre la transmission
+    a l'appareil, au lieu d'une simple mise a jour du cache."""
+    print("=" * 70)
+    print("PHASE 0 - LE DRAPEAU forceCheck")
+    print("=" * 70)
+    print("Valeur volontairement invalide : si forceCheck existe, l'erreur")
+    print("changera de nature. Le robot ne peut pas l'executer.\n")
+
+    path = f"/v3/iot-feature/feature/{serial}/{RESOURCE}/{IDX}/SweeperTaskMgr/CurrentTask"
+    out = []
+    attempts = [
+        ("forceCheck=true en parametre", {"forceCheck": "true"}, {"taskState": "zzInvalide"}),
+        ("forceCheck=1 en parametre", {"forceCheck": "1"}, {"taskState": "zzInvalide"}),
+        ("forceCheck dans le corps", {}, {"taskState": "zzInvalide", "forceCheck": True}),
+        ("temoin, sans forceCheck", {}, {"taskState": "zzInvalide"}),
+    ]
+    for label, params, value in attempts:
+        try:
+            status, body = raw_put(client, path, value, **params)
+            print(f"  [{status}] {label}")
+            print(f"      {body[:350]}")
+            out.append({"label": label, "status": status, "body": body[:4000]})
+        except Exception as err:  # noqa: BLE001
+            print(f"  !!  {label} -> {type(err).__name__}: {err}")
+    print()
+    return out
+
+
 def classify(err: str) -> str:
     if NOT_SUPPORTED in err:
         return "absent"
@@ -97,6 +134,12 @@ def main() -> None:
     print(f"\nConnexion OK - cible : {serial}")
     print(f"{len(DOMAINS)} domaines x {len(NAMES)} noms, sur deux routes.")
     print("Seules les trouvailles sont affichees. Compter quelques minutes.\n")
+
+    force = phase_force_check(client, serial)
+
+    print("=" * 70)
+    print("PHASE 1 - NOMS CACHES")
+    print("=" * 70)
 
     found: list[dict] = []
     tally: dict[str, int] = {}
@@ -126,7 +169,8 @@ def main() -> None:
         print(f"  ... {domain} termine")
 
     with open(OUTFILE, "w", encoding="utf-8") as fh:
-        json.dump({"tally": tally, "found": found}, fh, indent=2, ensure_ascii=False)
+        json.dump({"forceCheck": force, "tally": tally, "found": found},
+                  fh, indent=2, ensure_ascii=False)
 
     print("\n" + "=" * 70)
     print(f"Repartition : {tally}")
