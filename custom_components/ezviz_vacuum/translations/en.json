@@ -1,0 +1,24 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "EZVIZ Vacuum",
+        "description": "Credentials for the EZVIZ account the robot belongs to — the same ones you use in the mobile app.",
+        "data": {
+          "username": "EZVIZ account (email or phone)",
+          "password": "Password",
+          "region_url": "Region"
+        }
+      }
+    },
+    "error": {
+      "invalid_auth": "Incorrect account or password.",
+      "cannot_connect": "Could not reach the EZVIZ cloud.",
+      "mfa_required": "This account requires two-factor authentication, which the integration cannot handle yet.",
+      "no_vacuum": "No vacuum found on this account. Check that the robot is linked to it and online."
+    },
+    "abort": {
+      "already_configured": "This EZVIZ account is already configured."
+    }
+  }
+}

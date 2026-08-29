@@ -1,25 +1,79 @@
 # ha-ezviz-vacuum
 
-Intégration Home Assistant (en cours de développement) pour les aspirateurs
-robots EZVIZ — cible initiale : **EZVIZ RE5 Plus (CS-RE5P-TWT2)**.
+Intégration Home Assistant pour les aspirateurs robots **EZVIZ**, développée
+et validée sur un **EZVIZ RE5 Plus (CS-RE5P-TWT)**.
 
-## Pourquoi ce dépôt
+L'intégration officielle `ezviz` ne gère que les caméras, sonnettes, ampoules
+et prises : les robots ne correspondent à aucune de ses catégories d'appareil.
+Celle-ci parle au même cloud, par le bus « iot-feature ».
 
-L'intégration officielle `ezviz` de Home Assistant ne gère que les caméras,
-sonnettes, ampoules et prises. Les robots aspirateurs ne sont reconnus par
-aucune catégorie d'appareil de la bibliothèque `pyezvizapi`, et aucune
-intégration communautaire n'existe à ce jour.
+## Ce que ça donne
 
-En revanche, EZVIZ pilote ses appareils non-caméra via un bus générique
-« iot-feature » :
+Une entité `vacuum` — démarrage, pause, reprise, arrêt, retour à la base,
+puissance d'aspiration — plus des capteurs : batterie, panne en cours, et
+l'usure des cinq consommables (serpillère, filtre HEPA, brosses, capteurs).
+
+Les cartes et les pièces du robot, avec leurs vrais noms, sont exposées en
+attributs de l'entité.
+
+## Installation
+
+### Par HACS
+
+1. HACS → menu ⋮ → **Dépôts personnalisés**
+2. URL : `https://github.com/mickaelveber38-netizen/ha-ezviz-vacuum`,
+   catégorie **Integration**
+3. Chercher **EZVIZ Vacuum**, télécharger
+4. Redémarrer Home Assistant
+5. **Paramètres → Appareils et services → Ajouter une intégration** →
+   *EZVIZ Vacuum*
+
+### À la main
+
+Copier `custom_components/ezviz_vacuum/` dans le dossier `config/` de Home
+Assistant, redémarrer, puis ajouter l'intégration.
+
+### Configuration
+
+Les identifiants du compte EZVIZ, ceux de l'application mobile. La double
+authentification n'est pas encore prise en charge.
+
+## Limites connues
+
+- **Cloud uniquement.** Aucune commande locale : sans Internet, rien ne
+  répond. Le robot n'expose pas d'API sur le réseau local.
+- **Pas de nettoyage par pièce pour l'instant**, bien que le robot le
+  permette — voir *Nettoyage par pièce* plus bas, tout est documenté.
+- **Pas de carte affichable.** Les contours ne sont pas exposés par cette
+  API ; seuls les noms et identifiants des pièces le sont.
+- **Double authentification non gérée** à la configuration.
+
+## Compatibilité
+
+Développé contre Home Assistant **2026.8** et validé sur un **RE5 Plus**
+(firmware V0.01.92). Les autres robots EZVIZ (RE4, RE5, RS2, RC3, RS20…)
+utilisent vraisemblablement le même bus : les outils de `tools/` permettent de
+le vérifier, et les retours sont bienvenus.
+
+---
+
+# Notes de rétro-ingénierie
+
+Ce qui suit documente comment le protocole a été découvert, et surtout les
+impasses — pour éviter de les reparcourir.
+
+## Le bus iot-feature
+
+EZVIZ pilote ses appareils non-caméra via un bus générique :
 
 ```
 PUT /v3/iot-feature/feature/{SERIAL}/{resource}/{index}/{domain}/{action}
 PUT /v3/iot-feature/action/{SERIAL}/{resource}/{index}/{domain}/{action}
 ```
 
-C'est ce bus qui pilote déjà les ampoules EZVIZ. L'hypothèse de travail est
-que les robots y exposent aussi leurs commandes.
+C'est ce bus qui pilote déjà les ampoules EZVIZ. Les robots y exposent bien
+leurs commandes, mais **sur la route `action`, pas `feature`** — c'est ce
+détail qui a coûté le plus de temps.
 
 ## État d'avancement
 

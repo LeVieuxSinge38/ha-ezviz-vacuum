@@ -1,0 +1,12 @@
+{
+  "domain": "ezviz_vacuum",
+  "name": "EZVIZ Vacuum",
+  "codeowners": ["@mickaelveber38-netizen"],
+  "config_flow": true,
+  "documentation": "https://github.com/mickaelveber38-netizen/ha-ezviz-vacuum",
+  "integration_type": "hub",
+  "iot_class": "cloud_polling",
+  "issue_tracker": "https://github.com/mickaelveber38-netizen/ha-ezviz-vacuum/issues",
+  "requirements": ["pyezvizapi>=1.0.5"],
+  "version": "0.1.0"
+}

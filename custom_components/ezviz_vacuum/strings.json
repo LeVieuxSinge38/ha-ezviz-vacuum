@@ -1,0 +1,24 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "EZVIZ Vacuum",
+        "description": "Identifiants du compte EZVIZ auquel le robot est rattaché — les mêmes que dans l'application mobile.",
+        "data": {
+          "username": "Compte EZVIZ (e-mail ou téléphone)",
+          "password": "Mot de passe",
+          "region_url": "Région"
+        }
+      }
+    },
+    "error": {
+      "invalid_auth": "Compte ou mot de passe incorrect.",
+      "cannot_connect": "Connexion au cloud EZVIZ impossible.",
+      "mfa_required": "Ce compte exige une double authentification, que l'intégration ne sait pas encore traiter.",
+      "no_vacuum": "Aucun aspirateur sur ce compte. Vérifie que le robot y est rattaché et qu'il est en ligne."
+    },
+    "abort": {
+      "already_configured": "Ce compte EZVIZ est déjà configuré."
+    }
+  }
+}
