@@ -25,6 +25,8 @@ que les robots y exposent aussi leurs commandes.
 
 - [x] **Étape 1 — Découverte** : le RE5 Plus expose bien ses propriétés sur le
       bus iot-feature (voir *Ce qu'on sait* ci-dessous)
+- [x] **Étape 1a — Lecture confirmée** : `get_device_feature_value()` renvoie
+      bien les valeurs en direct (batterie, état de la tâche)
 - [ ] **Étape 1b — Actions** : trouver les commandes d'écriture (start, pause,
       retour base) — non listées dans `FEATURE_INFO`
 - [ ] **Étape 2 — Validation** : confirmer qu'écrire une clé fait réagir le robot
@@ -58,7 +60,31 @@ Propriétés utiles repérées :
 | `0.SweepingRobot.SweeperMapMgr.ForbiddenRegion[]` | zones interdites (coordonnées) |
 | `0.SweepingRobot.SweeperConsumable.*` | usure brosses / filtre / serpillère |
 
-Point ouvert : `FEATURE_INFO` ne liste que les propriétés **lisibles**. Les
+### Lecture — confirmée
+
+L'appel suivant fonctionne et renvoie la valeur en direct :
+
+```python
+client.get_device_feature_value(
+    "BD1522206", "SweepingRobot", "PowerMgr", "SurplusPower", local_index="0"
+)
+# -> {"meta": {"code": 200}, "data": 77}
+```
+
+L'URL sous-jacente est en cinq segments :
+`/v3/iot-feature/feature/{serial}/{resource}/{localIndex}/{domain}/{property}`.
+Une URL plus courte renvoie 404 (mauvaise arité) ou 400.
+
+Les 400 révèlent une **seconde route**, à paramètres de requête : elle attend
+`channelNo` (entier) et `itemKey` (chaîne non vide). Piste à explorer — elle
+pourrait renvoyer plusieurs propriétés d'un coup.
+
+`resourceInfos` confirme `resourceIdentifier = "SweepingRobot"` et
+`localIndex = "0"`.
+
+### Actions — point ouvert
+
+`FEATURE_INFO` ne liste que les propriétés **lisibles**. Les
 actions (démarrer, pause, retour à la base) passent vraisemblablement par
 `/v3/iot-feature/action/...` et restent à identifier — c'est le rôle de
 `tools/ezviz_probe.py`.
@@ -91,6 +117,18 @@ complet du produit, actions comprises. Ne peut pas faire bouger le robot.
 
 ```bash
 python3 tools/ezviz_probe.py [SERIAL]
+```
+
+### `tools/ezviz_probe2.py`
+
+Recherche les **actions**, toujours en lecture seule. Deux approches :
+la route à paramètres `channelNo`/`itemKey`, et un détecteur d'existence qui
+fait un `GET` sur les URL d'action — une action s'invoque en `PUT`, donc le
+`GET` ne déclenche rien, mais le code de retour (404 contre 405/400) trahit
+son existence.
+
+```bash
+python3 tools/ezviz_probe2.py [SERIAL]
 ```
 
 ### `tools/ezviz_try_action.py`
