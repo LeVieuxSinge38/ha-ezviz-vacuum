@@ -23,12 +23,49 @@ que les robots y exposent aussi leurs commandes.
 
 ## État d'avancement
 
-- [ ] **Étape 1 — Découverte** : lister les clés `FEATURE` exposées par le robot
+- [x] **Étape 1 — Découverte** : le RE5 Plus expose bien ses propriétés sur le
+      bus iot-feature (voir *Ce qu'on sait* ci-dessous)
+- [ ] **Étape 1b — Actions** : trouver les commandes d'écriture (start, pause,
+      retour base) — non listées dans `FEATURE_INFO`
 - [ ] **Étape 2 — Validation** : confirmer qu'écrire une clé fait réagir le robot
 - [ ] **Étape 3 — Intégration** : entité `vacuum` (start / pause / stop /
       return_to_base / batterie / puissance d'aspiration)
-- [ ] **Étape 4 — Cartographie** : nettoyage par zones, si le robot expose les
-      données nécessaires (incertain)
+- [ ] **Étape 4 — Cartographie** : nettoyage par pièce — les `roomID` sont
+      exposés, c'est jouable
+
+## Ce qu'on sait (RE5 Plus, firmware V0.01.92)
+
+Catégorie EZVIZ : `SweepingRobot` / sous-type `RE5P`.
+
+Les propriétés arrivent dans le bloc `FEATURE_INFO` sous la forme
+`{localIndex}.{resource}.{domain}.{property}`, ce qui correspond directement à
+l'URL du bus iot-feature :
+
+```
+/v3/iot-feature/feature/{SERIAL}/{resource}/{localIndex}/{domain}/{property}
+```
+
+Propriétés utiles repérées :
+
+| Chemin | Rôle |
+|---|---|
+| `0.SweepingRobot.PowerMgr.SurplusPower` | niveau de batterie (%) |
+| `0.SweepingRobot.SweeperTaskMgr.CurrentTask.taskState` | état de la tâche courante |
+| `0.SweepingRobot.SweeperTaskMgr.CurrentTask.inCharging` | en charge ou non |
+| `0.SweepingRobot.SweeperMapMgr.MapBasicProperty[]` | cartes : `mapID`, `mapName`, `inUse` |
+| `0.SweepingRobot.SweeperMapMgr.RoomCustomCleanCfg[]` | pièces par carte : `roomID`, `fanMode`, `waterQuantity`, `cleanTimes` |
+| `0.SweepingRobot.SweeperMapMgr.VirtualWall[]` | murs virtuels |
+| `0.SweepingRobot.SweeperMapMgr.ForbiddenRegion[]` | zones interdites (coordonnées) |
+| `0.SweepingRobot.SweeperConsumable.*` | usure brosses / filtre / serpillère |
+
+Point ouvert : `FEATURE_INFO` ne liste que les propriétés **lisibles**. Les
+actions (démarrer, pause, retour à la base) passent vraisemblablement par
+`/v3/iot-feature/action/...` et restent à identifier — c'est le rôle de
+`tools/ezviz_probe.py`.
+
+Note : `productId` revient à `None` via `get_device_infos()`, donc
+`set_device_feature_by_key()` n'est pas utilisable tel quel. Il faudra passer
+par `set_iot_feature()` / `set_iot_action()`, qui n'en ont pas besoin.
 
 ## Outils
 
@@ -46,6 +83,15 @@ python3 tools/ezviz_dump.py
 > Le fichier `ezviz_dump.json` contient les numéros de série et codes de
 > vérification de tous les appareils du compte. Il est ignoré par Git —
 > ne le commite jamais.
+
+### `tools/ezviz_probe.py`
+
+Sonde **en lecture seule** le bus iot-feature pour faire apparaître le schéma
+complet du produit, actions comprises. Ne peut pas faire bouger le robot.
+
+```bash
+python3 tools/ezviz_probe.py [SERIAL]
+```
 
 ### `tools/ezviz_try_action.py`
 

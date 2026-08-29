@@ -1,4 +1,5 @@
 ezviz_dump.json
+ezviz_probe.json
 ezviz_token.json
 __pycache__/
 *.pyc
