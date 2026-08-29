@@ -13,8 +13,29 @@ Une entité `vacuum` — démarrage, pause, reprise, arrêt, retour à la base,
 puissance d'aspiration — plus des capteurs : batterie, panne en cours, et
 l'usure des cinq consommables (serpillère, filtre HEPA, brosses, capteurs).
 
-Les cartes et les pièces du robot, avec leurs vrais noms, sont exposées en
-attributs de l'entité.
+**Nettoyage par pièce** via le service natif `vacuum.clean_area` : les pièces
+du robot sont exposées comme segments, et Home Assistant fournit l'écran
+d'association pièce ↔ zone dans les paramètres de l'entité.
+
+```yaml
+actions:
+  - action: vacuum.clean_area
+    target:
+      entity_id: vacuum.re5_plus
+    data:
+      area_id:
+        - cuisine
+```
+
+Les cartes et les pièces du robot sont aussi exposées en attributs de
+l'entité.
+
+### Associer les pièces aux zones
+
+**Paramètres → Appareils et services → Entités → RE5 Plus → roue dentée**,
+puis la section de correspondance des zones. Chaque pièce du robot s'y
+rattache à une zone Home Assistant. Une fois fait, `vacuum.clean_area`
+fonctionne comme sur n'importe quel autre aspirateur.
 
 ## Installation
 
@@ -42,8 +63,19 @@ authentification n'est pas encore prise en charge.
 
 - **Cloud uniquement.** Aucune commande locale : sans Internet, rien ne
   répond. Le robot n'expose pas d'API sur le réseau local.
-- **Pas de nettoyage par pièce pour l'instant**, bien que le robot le
-  permette — voir *Nettoyage par pièce* plus bas, tout est documenté.
+- **Le nettoyage par pièce change un réglage du robot.** Il n'existe pas de
+  commande « nettoie telle pièce » : la sélection est un réglage persistant.
+  Lancer une zone bascule la carte en mode `custom` et y laisse l'ordre de
+  passage. Un démarrage manuel ultérieur depuis l'application ne nettoiera
+  donc que les dernières pièces choisies, jusqu'à ce que le mode soit remis
+  sur « toute la surface ».
+- **Une seule carte à la fois.** Le robot ne travaille que sur sa carte
+  active ; demander des pièces d'un autre étage échoue avec un message
+  explicite plutôt que de nettoyer à moitié.
+- **Les noms de pièces ne remontent pas toujours.** `RoomBasicProperty`
+  renvoie parfois autre chose que le tableau attendu ; les pièces s'appellent
+  alors « Pièce 3 ». Sans conséquence : c'est l'association aux zones Home
+  Assistant qui leur donne leur vrai nom.
 - **Pas de carte affichable.** Les contours ne sont pas exposés par cette
   API ; seuls les noms et identifiants des pièces le sont.
 - **Double authentification non gérée** à la configuration.
@@ -91,7 +123,8 @@ détail qui a coûté le plus de temps.
       return_to_base / batterie / puissance d'aspiration)
 - [x] **Étape 4a — Schéma des cartes** : extrait, le nettoyage par pièce est
       pilotable (voir *Nettoyage par pièce*)
-- [ ] **Étape 4b — Nettoyage par pièce** : à implémenter et valider
+- [x] **Étape 4b — Nettoyage par pièce** : implémenté via `vacuum.clean_area`
+      (segments + association aux zones gérée par Home Assistant)
 
 ## Ce qu'on sait (RE5 Plus, firmware V0.01.92)
 
@@ -310,7 +343,8 @@ la tâche.
 `universal` = toute la surface, `custom` = 按房间定制, « personnalisé par
 pièce ».
 
-**Séquence pour nettoyer des pièces précises** — à valider :
+**Séquence pour nettoyer des pièces précises** — implémentée dans
+`vacuum.py` :
 
 1. `RoomCustomCleanCfg` : `order` positif sur les pièces voulues, `-1` sur les
    autres

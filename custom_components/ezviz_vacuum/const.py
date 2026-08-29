@@ -40,6 +40,7 @@ DOMAIN_MAP: Final = "SweeperMapMgr"
 PROP_STD_CLEAN: Final = "StdCleanCfg"
 PROP_MAP_BASIC: Final = "MapBasicProperty"
 PROP_ROOM_BASIC: Final = "RoomBasicProperty"
+PROP_ROOM_CUSTOM: Final = "RoomCustomCleanCfg"
 DOMAIN_CONSUMABLE: Final = "SweeperConsumable"
 
 # --- Écriture : c'est la route « action » qui commande, jamais « feature ».
@@ -74,6 +75,12 @@ FAN_SPEEDS: Final = {
     "strong": "Puissant",
     "super": "Maximum",
 }
+
+#: Ordre de nettoyage : -1 exclut la pièce de la tâche.
+ORDER_EXCLUDED: Final = -1
+#: `cleanConfigType` : toute la surface, ou sélection par pièce.
+CLEAN_UNIVERSAL: Final = "universal"
+CLEAN_CUSTOM: Final = "custom"
 
 #: Consommables : propriété -> (clé d'entité, libellé).
 CONSUMABLES: Final = {

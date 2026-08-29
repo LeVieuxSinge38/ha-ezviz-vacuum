@@ -26,7 +26,10 @@ from .const import (
     PROP_CURRENT_TASK,
     PROP_MAP_BASIC,
     PROP_ROOM_BASIC,
+    PROP_ROOM_CUSTOM,
     PROP_STD_CLEAN,
+    CLEAN_CUSTOM,
+    ORDER_EXCLUDED,
     RESOURCE,
     SOURCE_MOBILE,
 )
@@ -82,19 +85,30 @@ class EzvizVacuumApi:
         }
 
     def fetch_slow(self, serial: str) -> dict[str, Any]:
-        """Ce qui bouge lentement : consommables, cartes, mode de nettoyage."""
+        """Ce qui bouge lentement : consommables, cartes, pièces, mode."""
         consumables: dict[str, Any] = {}
         for prop, (key, _label) in CONSUMABLES.items():
             value = self._read(serial, DOMAIN_CONSUMABLE, prop)
             if isinstance(value, dict):
                 consumables[key] = value
 
-        return {
+        slow = {
             "consumables": consumables,
             "std_clean": self._read(serial, DOMAIN_MAP, PROP_STD_CLEAN),
             "maps": self._read(serial, DOMAIN_MAP, PROP_MAP_BASIC),
             "rooms": self._read(serial, DOMAIN_MAP, PROP_ROOM_BASIC),
+            "room_cfg": self._read(serial, DOMAIN_MAP, PROP_ROOM_CUSTOM),
         }
+        # RoomBasicProperty ne renvoie pas toujours le tableau attendu : on
+        # trace sa forme réelle pour pouvoir s'y adapter.
+        _LOGGER.debug(
+            "Formes lues - maps=%s rooms=%s room_cfg=%s std_clean=%s",
+            type(slow["maps"]).__name__,
+            repr(slow["rooms"])[:400],
+            type(slow["room_cfg"]).__name__,
+            type(slow["std_clean"]).__name__,
+        )
+        return slow
 
     # ------------------------------------------------------------------
     # Écriture
@@ -138,6 +152,64 @@ class EzvizVacuumApi:
             ACTION_RECHARGE,
             {"action": action, "source": SOURCE_MOBILE},
         )
+
+    def clean_rooms(
+        self,
+        serial: str,
+        room_ids: set[tuple[int, int]],
+        room_cfg: Any,
+        std_clean: Any,
+        map_id: int,
+    ) -> None:
+        """Lance un nettoyage limité aux pièces demandées.
+
+        Le robot n'a pas de commande « nettoie telle pièce » : la sélection est
+        un réglage. On donne un ordre de passage positif aux pièces voulues et
+        `-1` aux autres, on bascule la carte en mode `custom`, puis on lance un
+        nettoyage normal.
+        """
+        if not isinstance(room_cfg, list) or not isinstance(std_clean, list):
+            raise RuntimeError(
+                "Configuration des pièces illisible : nettoyage par zone "
+                "impossible."
+            )
+
+        # 1. Ordre de passage : positif pour les pièces retenues, -1 sinon.
+        cfg_payload = []
+        rank = 0
+        for map_entry in room_cfg:
+            entry = dict(map_entry)
+            entry_map = entry.get("mapID")
+            rooms = []
+            for room in entry.get("room", []):
+                room = dict(room)
+                if (entry_map, room.get("roomID")) in room_ids:
+                    rank += 1
+                    room["order"] = rank
+                else:
+                    room["order"] = ORDER_EXCLUDED
+                rooms.append(room)
+            entry["room"] = rooms
+            cfg_payload.append(entry)
+
+        self._client.set_iot_feature(
+            serial, RESOURCE, LOCAL_INDEX, DOMAIN_MAP, PROP_ROOM_CUSTOM, cfg_payload
+        )
+
+        # 2. La carte doit être en mode « personnalisé par pièce ».
+        std_payload = []
+        for entry in std_clean:
+            entry = dict(entry)
+            if entry.get("mapID") == map_id:
+                entry["cleanConfigType"] = CLEAN_CUSTOM
+            std_payload.append(entry)
+
+        self._client.set_iot_feature(
+            serial, RESOURCE, LOCAL_INDEX, DOMAIN_MAP, PROP_STD_CLEAN, std_payload
+        )
+
+        # 3. Le démarrage est la commande habituelle.
+        self.clean(serial, "start")
 
     def set_fan_mode(self, serial: str, fan_mode: str, std_clean: Any) -> None:
         """Écrit `fanMode` sur toutes les cartes du robot.

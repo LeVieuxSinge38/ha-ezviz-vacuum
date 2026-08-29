@@ -10,6 +10,15 @@ from homeassistant.components.vacuum import (
     VacuumActivity,
     VacuumEntityFeature,
 )
+from homeassistant.exceptions import ServiceValidationError
+
+try:  # `Segment` et CLEAN_AREA sont apparus avec Home Assistant 2026.3.
+    from homeassistant.components.vacuum import Segment
+
+    HAS_SEGMENTS = hasattr(VacuumEntityFeature, "CLEAN_AREA")
+except ImportError:  # pragma: no cover - versions antérieures
+    Segment = None
+    HAS_SEGMENTS = False
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
@@ -38,6 +47,8 @@ def _supported_features() -> VacuumEntityFeature:
     )
     if hasattr(VacuumEntityFeature, "STATE"):
         features |= VacuumEntityFeature.STATE
+    if HAS_SEGMENTS:
+        features |= VacuumEntityFeature.CLEAN_AREA
     return features
 
 
@@ -181,6 +192,114 @@ class EzvizVacuum(EzvizVacuumBaseEntity, StateVacuumEntity):
             mode,
             self._data.get("std_clean"),
         )
+
+    # ------------------------------------------------------------------
+    # Nettoyage par pièce
+    # ------------------------------------------------------------------
+    def _segments(self) -> list[tuple[int, int, str, str]]:
+        """Pièces du robot : (mapID, roomID, nom, nom de la carte).
+
+        Les identifiants viennent de `RoomCustomCleanCfg`, qui est fiable.
+        `RoomBasicProperty` porte les vrais noms mais ne les renvoie pas
+        toujours : on retombe alors sur « Pièce N ». Ce n'est pas gênant,
+        puisque c'est l'utilisateur qui associe ensuite chaque pièce à une
+        zone Home Assistant.
+        """
+        map_names: dict[int, str] = {}
+        maps = self._data.get("maps")
+        if isinstance(maps, list):
+            for entry in maps:
+                if isinstance(entry, dict) and entry.get("mapID") is not None:
+                    map_names[entry["mapID"]] = entry.get("mapName") or ""
+
+        room_names: dict[tuple[int, int], str] = {}
+        rooms = self._data.get("rooms")
+        if isinstance(rooms, list):
+            for entry in rooms:
+                if not isinstance(entry, dict):
+                    continue
+                map_id = entry.get("mapID")
+                for room in entry.get("room", []):
+                    if isinstance(room, dict) and room.get("roomName"):
+                        room_names[(map_id, room.get("roomID"))] = room["roomName"]
+
+        segments: list[tuple[int, int, str, str]] = []
+        room_cfg = self._data.get("room_cfg")
+        if not isinstance(room_cfg, list):
+            return segments
+
+        for entry in room_cfg:
+            if not isinstance(entry, dict):
+                continue
+            map_id = entry.get("mapID")
+            for room in entry.get("room", []):
+                if not isinstance(room, dict):
+                    continue
+                if room.get("regionType") != "room":
+                    continue
+                room_id = room.get("roomID")
+                if map_id is None or room_id is None:
+                    continue
+                name = room_names.get((map_id, room_id)) or f"Pièce {room_id}"
+                segments.append((map_id, room_id, name, map_names.get(map_id, "")))
+        return segments
+
+    async def async_get_segments(self) -> list:
+        """Expose les pièces à Home Assistant, qui gère l'association aux zones."""
+        if not HAS_SEGMENTS:
+            return []
+        return [
+            Segment(id=f"{map_id}-{room_id}", name=name, group=map_name or None)
+            for map_id, room_id, name, map_name in self._segments()
+        ]
+
+    async def async_clean_segments(self, segment_ids: list[str], **kwargs: Any) -> None:
+        """Nettoie les pièces demandées."""
+        wanted: set[tuple[int, int]] = set()
+        maps_touched: set[int] = set()
+        for map_id, room_id, _name, _map_name in self._segments():
+            if f"{map_id}-{room_id}" in segment_ids:
+                wanted.add((map_id, room_id))
+                maps_touched.add(map_id)
+
+        if not wanted:
+            raise ServiceValidationError(
+                "Aucune pièce connue ne correspond à cette demande."
+            )
+
+        # Le robot ne travaille que sur la carte active : mélanger deux étages
+        # produirait un nettoyage silencieusement incomplet.
+        if len(maps_touched) > 1:
+            raise ServiceValidationError(
+                "Les pièces demandées appartiennent à plusieurs cartes. "
+                "Le robot ne peut nettoyer qu'une carte à la fois."
+            )
+
+        map_id = maps_touched.pop()
+        active = self._active_map_id()
+        if active is not None and map_id != active:
+            raise ServiceValidationError(
+                f"Ces pièces sont sur une carte inactive. Bascule le robot sur "
+                f"cette carte dans l'application EZVIZ, puis relance."
+            )
+
+        await self.coordinator.async_send(
+            self.coordinator.api.clean_rooms,
+            self._serial,
+            wanted,
+            self._data.get("room_cfg"),
+            self._data.get("std_clean"),
+            map_id,
+        )
+
+    def _active_map_id(self) -> int | None:
+        maps = self._data.get("maps")
+        if not isinstance(maps, list):
+            return None
+        for entry in maps:
+            if isinstance(entry, dict) and entry.get("inUse"):
+                return entry.get("mapID")
+        return None
 
     async def async_send_command(
         self,
