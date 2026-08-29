@@ -95,7 +95,15 @@ relevait les propriétés. Chemin :
 | `''` | à l'arrêt / inactif | — |
 | `'clean'` | nettoyage en cours | `0` |
 | `'cleanPause'` | en pause | `0` |
-| *(à capturer)* | retour à la base | — |
+
+**Le retour à la base n'a pas d'état propre.** Vérifié sur un cycle complet :
+`taskState` repasse à `''`, puis `inCharging` passe à `1` une fois arrimé.
+Aucune valeur `backCharge` / `goCharge` n'existe. Inutile de la chercher.
+
+⚠️ **`taskState` clignote.** Pendant un nettoyage ininterrompu il alterne
+`'clean'` et `''` toutes les 20–40 s. Une intégration qui s'y fierait seule
+afficherait « à l'arrêt » en pleine session. Il faut le croiser avec
+`inCharging` et amortir les transitions.
 
 Autres observations pendant un cycle :
 
@@ -197,6 +205,18 @@ le robot qui livre son vocabulaire, au lieu de le deviner.
 
 ```bash
 python3 tools/ezviz_watch.py [SERIAL]   # Ctrl+C pour arrêter
+```
+
+### `tools/ezviz_write_test.py`
+
+Teste l'**écriture** sans effet sur le robot. Deux principes : réécrire une
+valeur bénigne à l'identique (le volume des bips, à sa valeur actuelle) pour
+valider le mécanisme sans rien changer ; puis écrire une valeur volontairement
+invalide sur la tâche courante — elle ne peut pas être exécutée, mais la forme
+de l'erreur distingue « chemin non inscriptible » de « valeur refusée ».
+
+```bash
+python3 tools/ezviz_write_test.py [SERIAL]
 ```
 
 ### `tools/ezviz_try_action.py`
