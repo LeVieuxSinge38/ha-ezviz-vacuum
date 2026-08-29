@@ -27,8 +27,10 @@ que les robots y exposent aussi leurs commandes.
       bus iot-feature (voir *Ce qu'on sait* ci-dessous)
 - [x] **Étape 1a — Lecture confirmée** : `get_device_feature_value()` renvoie
       bien les valeurs en direct (batterie, état de la tâche)
-- [ ] **Étape 1b — Actions** : trouver les commandes d'écriture (start, pause,
-      retour base) — non listées dans `FEATURE_INFO`
+- [x] **Étape 1b — Vocabulaire d'état** : capturé en observant le robot piloté
+      depuis l'app (voir *États observés*). Manque l'état de retour à la base.
+- [ ] **Étape 1c — Écriture** : trouver comment commander (le chemin est
+      probablement `SweeperTaskMgr/CurrentTask` en `PUT`)
 - [ ] **Étape 2 — Validation** : confirmer qu'écrire une clé fait réagir le robot
 - [ ] **Étape 3 — Intégration** : entité `vacuum` (start / pause / stop /
       return_to_base / batterie / puissance d'aspiration)
@@ -81,6 +83,29 @@ pourrait renvoyer plusieurs propriétés d'un coup.
 
 `resourceInfos` confirme `resourceIdentifier = "SweepingRobot"` et
 `localIndex = "0"`.
+
+### États observés
+
+Capturés en pilotant le robot depuis l'app EZVIZ pendant que `ezviz_watch.py`
+relevait les propriétés. Chemin :
+`0.SweepingRobot.SweeperTaskMgr.CurrentTask`.
+
+| `taskState` | Signification | `inCharging` |
+|---|---|---|
+| `''` | à l'arrêt / inactif | — |
+| `'clean'` | nettoyage en cours | `0` |
+| `'cleanPause'` | en pause | `0` |
+| *(à capturer)* | retour à la base | — |
+
+Autres observations pendant un cycle :
+
+- `PowerMgr.SurplusPower` décroît d'environ 1 % par 30 s en nettoyage
+- `CurrentTask.datetime` est un battement de cœur, mis à jour en permanence —
+  à ignorer dans une intégration, sinon l'entité se rafraîchit sans cesse
+- `SweeperMapMgr.StdCleanCfg[0].mapID` change quand le robot bascule de carte
+- `CurrentTask.exception` est resté vide même quand le robot s'est retrouvé
+  bloqué par un objet et soulevé — ce champ ne semble pas remonter les
+  incidents physiques
 
 ### Actions — point ouvert
 
