@@ -34,8 +34,9 @@ que les robots y exposent aussi leurs commandes.
 - [ ] **Étape 2 — Validation** : confirmer qu'écrire une clé fait réagir le robot
 - [ ] **Étape 3 — Intégration** : entité `vacuum` (start / pause / stop /
       return_to_base / batterie / puissance d'aspiration)
-- [ ] **Étape 4 — Cartographie** : nettoyage par pièce — les `roomID` sont
-      exposés, c'est jouable
+- [x] **Étape 4a — Schéma des cartes** : extrait, le nettoyage par pièce est
+      pilotable (voir *Nettoyage par pièce*)
+- [ ] **Étape 4b — Nettoyage par pièce** : à implémenter et valider
 
 ## Ce qu'on sait (RE5 Plus, firmware V0.01.92)
 
@@ -176,6 +177,94 @@ Trois réponses distinctes, à savoir lire :
 Le schéma de `CurrentTask` contient aussi l'énumération complète des pannes
 (`CR_LidarInitErr`, `CR_MopInstallErr`, `CR_DockDryFanStall`…), matière à de
 vrais capteurs de diagnostic.
+
+## Nettoyage par pièce
+
+Tout est en écriture. Trois propriétés à combiner.
+
+**`SweeperMapMgr.RoomBasicProperty`** (`rw`) — l'annuaire des pièces, avec
+leurs noms. À lire pour nommer les zones côté Home Assistant.
+
+```
+[{ mapID, room: [{ roomID, roomName, backgroundColor }] }]
+```
+
+⚠️ `FEATURE_INFO` la réduit à `true` ; il faut passer par
+`get_device_feature_value()` pour obtenir le tableau réel.
+
+**`SweeperMapMgr.RoomCustomCleanCfg`** (`rw`) — le réglage par pièce.
+
+```
+[{ mapID, room: [{ regionType: "room" | "customRegion",
+                   roomID,          # si regionType = room
+                   customRegionID,  # si regionType = customRegion
+                   fanMode, waterQuantity, cleanTimes,
+                   order }] }]
+```
+
+`order` (清洁顺序, ordre de nettoyage) commande la sélection : les pièces du
+robot sont toutes à `-1`, donc exclues. Un ordre positif les fait entrer dans
+la tâche.
+
+**`SweeperMapMgr.StdCleanCfg`** (`rw`) — le mode global de la carte.
+
+```
+[{ mapID, cleanConfigType: "universal" | "custom",
+   fanMode, waterQuantity, cleanTimes }]
+```
+
+`universal` = toute la surface, `custom` = 按房间定制, « personnalisé par
+pièce ».
+
+**Séquence pour nettoyer des pièces précises** — à valider :
+
+1. `RoomCustomCleanCfg` : `order` positif sur les pièces voulues, `-1` sur les
+   autres
+2. `StdCleanCfg` : `cleanConfigType = "custom"` sur la carte concernée
+3. `CurrentTask` : `{"taskState": "clean"}`
+
+### Réglages d'aspiration
+
+Communs à `StdCleanCfg` et `RoomCustomCleanCfg` — ils alimenteront le
+`fan_speed` de l'entité Home Assistant :
+
+| `fanMode` | | `waterQuantity` | |
+|---|---|---|---|
+| `quiet` | silencieux | `dry` | serpillère sèche |
+| `normal` | standard | `low` | faible |
+| `strong` | puissant | `middle` | moyen |
+| `super` | maximum | `high` | élevé |
+
+### Zones interdites et murs virtuels
+
+`ForbiddenRegion` et `VirtualWall` sont en écriture, coordonnées comprises —
+de quoi créer une zone interdite depuis une automatisation.
+
+- `ForbiddenRegion` : rectangles `ltx/lty/rbx/rby`, de type `sweep`, `mop`,
+  `sweepMop` ou `time` (interdiction horaire, avec `timeStart`/`timeEnd`)
+- `VirtualWall` : segments `startX/startY` → `endX/endY`
+
+### Diagnostic
+
+`CurrentTask.exception` énumère environ 80 pannes, chacune traduite :
+`CR_RollBrushTwine` (brosse enroulée), `CR_DirtyWaterBoxFull` (bac à eau sale
+plein), `CR_FailToReturnDock` (échec du retour à la base),
+`CR_CleanWaterBoxEmpty` (réservoir vide), `CR_Trapped` (robot coincé)…
+Matière à de vrais capteurs, plutôt qu'un booléen « en erreur ».
+
+### Autres propriétés inscriptibles
+
+| Propriété | Forme |
+|---|---|
+| `SweeperCleanTask.CarpetTurboCleanSwitch` | `{"enabled": bool}` — surpression sur tapis |
+| `SweeperMgr.RestMode` | `{"enabled", "startTime", "endTime"}` — mode silence |
+| `SweeperMgr.ValleyCharge` | idem — charge en heures creuses |
+| `SoundSetting.PromptToneVolume` | entier |
+| `InfoMgr.DeviceLanguage` | `{"languageType": "french"}` |
+| `SweeperMapMgr.AreaUnitCfg` | `{"unit": "m2"}` |
+
+`SweeperMapMgr.CustomRegion` répond `设备不支持该功能` : elle apparaît dans
+`FEATURE_INFO` mais n'est pas inscriptible sur ce modèle.
 
 ### Actions — point ouvert
 
