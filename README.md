@@ -30,6 +30,25 @@ actions:
 Les cartes et les pièces du robot sont aussi exposées en attributs de
 l'entité.
 
+### Lancer une pièce sans l'associer
+
+`vacuum.clean_area` exige une association préalable. Pour lancer une pièce
+directement — notamment pour découvrir quel numéro correspond à quelle
+pièce — passer par `send_command` :
+
+```yaml
+actions:
+  - action: vacuum.send_command
+    target:
+      entity_id: vacuum.re5_plus
+    data:
+      command: clean_rooms
+      params:
+        segments: ["22-3"]
+```
+
+L'identifiant d'une pièce s'écrit `{mapID}-{roomID}`.
+
 ### Associer les pièces aux zones
 
 **Paramètres → Appareils et services → Entités → RE5 Plus → roue dentée**,

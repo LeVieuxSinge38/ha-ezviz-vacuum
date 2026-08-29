@@ -254,7 +254,7 @@ class EzvizVacuum(EzvizVacuumBaseEntity, StateVacuumEntity):
         ]
 
     async def async_clean_segments(self, segment_ids: list[str], **kwargs: Any) -> None:
-        """Nettoie les pièces demandées."""
+        """Nettoie les pièces demandées, désignées par leur identifiant."""
         wanted: set[tuple[int, int]] = set()
         maps_touched: set[int] = set()
         for map_id, room_id, _name, _map_name in self._segments():
@@ -310,7 +310,10 @@ class EzvizVacuum(EzvizVacuumBaseEntity, StateVacuumEntity):
         """Passe une commande brute, pour ce que l'entité n'expose pas.
 
         `clean` accepte start, pause, resume, stop ;
-        `recharge` accepte start et stop.
+        `recharge` accepte start et stop ;
+        `clean_rooms` prend une liste d'identifiants de pièces, ce qui permet
+        de lancer une pièce sans avoir à l'associer d'abord à une zone Home
+        Assistant — utile pour découvrir quelle pièce porte quel numéro.
         """
         if command == "clean":
             action = (params or {}).get("action", "start")
@@ -322,5 +325,10 @@ class EzvizVacuum(EzvizVacuumBaseEntity, StateVacuumEntity):
             await self.coordinator.async_send(
                 self.coordinator.api.recharge, self._serial, action
             )
+        elif command == "clean_rooms":
+            segments = (params or {}).get("segments") or []
+            if isinstance(segments, str):
+                segments = [segments]
+            await self.async_clean_segments([str(s) for s in segments])
         else:
             raise ValueError(f"Commande inconnue : {command}")
