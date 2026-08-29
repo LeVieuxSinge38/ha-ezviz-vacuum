@@ -31,7 +31,8 @@ que les robots y exposent aussi leurs commandes.
       depuis l'app (voir *États observés*). Manque l'état de retour à la base.
 - [x] **Étape 1c — Écriture** : mécanisme trouvé et validé (voir *Commander
       le robot*)
-- [ ] **Étape 2 — Validation** : confirmer qu'écrire une clé fait réagir le robot
+- [x] **Étape 2 — Validation** : `start`, `pause`, `resume` et `stop` testés
+      sur le robot, tous suivis d'effet
 - [ ] **Étape 3 — Intégration** : entité `vacuum` (start / pause / stop /
       return_to_base / batterie / puissance d'aspiration)
 - [x] **Étape 4a — Schéma des cartes** : extrait, le nettoyage par pièce est
@@ -138,8 +139,38 @@ appareil, c'est le vrai canal de commande) :
 | `resume` | 继续清洁 — reprendre |
 | `stop` | 停止清洁 — arrêter |
 
-`source` vaut `mobile` (app) ou `smartSpeaker` (enceinte). `action` est requis,
-`source` non.
+`source` vaut `mobile` (app) ou `smartSpeaker` (enceinte). Pour `CleanCtrl`,
+seul `action` est requis.
+
+**Retour à la base** — autre domaine, autre action :
+
+```python
+client.set_iot_action(
+    "BD1522206", "SweepingRobot", "0",
+    "SweeperTaskMgr", "RechargeCtrl",
+    {"action": "start", "source": "mobile"},
+)
+```
+
+`RechargeCtrl` (`sid=3`, `direction=Plt2Dev`) prend `action` ∈ `start`
+(开始回充, lancer le retour) ou `stop` (结束回充, l'interrompre). Ici
+**`action` et `source` sont tous deux requis**.
+
+`CleanCtrl` avec `stop` renvoie aussi le robot à sa base — vérifié.
+
+### Reconnaître une commande qui a vraiment abouti
+
+Une commande reçue par l'appareil renvoie un bloc `deviceMeta` :
+
+```json
+{"meta": {"code": 200, "message": "success",
+          "moreInfo": {"deviceMeta": {"code": "0x00000000",
+                                      "errorMsg": "success"}}}}
+```
+
+C'est l'accusé de réception du robot. Un `200` **sans** `deviceMeta` (comme
+pour une écriture sur `CurrentTask`) signifie que seul le cloud a répondu et
+que l'appareil n'a rien reçu.
 
 > ⚠️ **`SweeperTaskMgr.CurrentTask` n'est PAS une commande.** C'est un miroir
 > d'état (`access=rwu`, le `u` pour *upload* : l'appareil le remonte). Y écrire
