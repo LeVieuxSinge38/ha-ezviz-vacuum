@@ -89,9 +89,41 @@ actions (démarrer, pause, retour à la base) passent vraisemblablement par
 `/v3/iot-feature/action/...` et restent à identifier — c'est le rôle de
 `tools/ezviz_probe.py`.
 
-Note : `productId` revient à `None` via `get_device_infos()`, donc
-`set_device_feature_by_key()` n'est pas utilisable tel quel. Il faudra passer
-par `set_iot_feature()` / `set_iot_action()`, qui n'en ont pas besoin.
+### L'oracle d'existence
+
+Un `GET` sur le chemin en cinq segments répond **toujours** HTTP 200 ; c'est le
+code **interne** qui tranche :
+
+| Réponse interne | Signification |
+|---|---|
+| `{"code":200, "data":…}` | la propriété existe, voici sa valeur |
+| `{"code":400, "msgDetail":"设备不支持该功能"}` | l'appareil ne gère pas cette fonction |
+
+C'est un détecteur fiable et sans effet de bord : on peut tester autant de noms
+qu'on veut sans jamais rien déclencher.
+
+### productId
+
+`get_device_infos()` renvoie `productId: None`, mais l'API se trahit dans ses
+messages d'erreur — la route à paramètres recrache son objet interne :
+
+```
+FeatureGetParam(devSerial=BD1522206, protocol=0, channelNo=0,
+                itemKey=…, productId=CS-RE5P-TWT,
+                firmVersion=V0.01.92 build 240428, vFeatureItem=null)
+```
+
+**`productId = CS-RE5P-TWT`** (identique à `deviceType`). `itemKey` y est une
+clé plate, pas un chemin pointé : les chemins `SweepingRobot.PowerMgr.…`
+renvoient tous `itemKey不存在`.
+
+### Ce qui ne marche pas — à ne pas refaire
+
+- `/v3/iot-feature/action/…` en `GET` répond **405 pour tout**, y compris des
+  noms inventés (page d'erreur Tomcat). Inutilisable comme détecteur.
+  `OPTIONS` confirme `Allow: PUT`.
+- Deux balayages de noms d'actions plausibles (228 combinaisons chacun) :
+  aucun résultat. Deviner les noms est une impasse.
 
 ## Outils
 
@@ -129,6 +161,17 @@ son existence.
 
 ```bash
 python3 tools/ezviz_probe2.py [SERIAL]
+```
+
+### `tools/ezviz_watch.py`
+
+Surveille **en lecture seule** toutes les propriétés du robot et n'affiche que
+ce qui change. On pilote le robot depuis l'app EZVIZ pendant que le script
+tourne : chaque appui révèle la propriété concernée et sa valeur exacte. C'est
+le robot qui livre son vocabulaire, au lieu de le deviner.
+
+```bash
+python3 tools/ezviz_watch.py [SERIAL]   # Ctrl+C pour arrêter
 ```
 
 ### `tools/ezviz_try_action.py`
