@@ -5,6 +5,7 @@ ezviz_watch.json
 ezviz_write_test.json
 ezviz_schema.json
 ezviz_hunt.json
+ezviz_go.json
 ezviz_token.json
 __pycache__/
 *.pyc

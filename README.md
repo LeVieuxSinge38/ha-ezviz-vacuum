@@ -118,57 +118,51 @@ Autres observations pendant un cycle :
 
 ## Commander le robot
 
-> ⚠️ **`CurrentTask` est un miroir d'état, pas une commande.** Y écrire
-> renvoie `200` et le robot ne bouge pas. Pire : l'écriture **remplace l'objet
-> entier** dans le cache du cloud — après un envoi de `{"taskState": …}`, la
-> relecture ne renvoie plus que ce seul champ, `inCharging`, `exception`,
-> `datetime` et `ID` ayant disparu. On écrase la copie que le cloud garde de
-> l'appareil ; le robot n'en sait rien. Le `u` de `access=rwu` signifie sans
-> doute *upload* : c'est l'appareil qui remonte cette propriété.
->
-> Le cache se répare seul, l'appareil republiant son état toutes les ~4 s.
->
-> La vraie commande est ailleurs. Piste en cours : une propriété en **écriture
-> seule**, invisible dans `FEATURE_INFO` qui ne liste que le lisible ; et le
-> drapeau `forceCheck` aperçu dans le `PropertyRequest`.
-
-Le mécanisme d'écriture lui-même est validé (réécriture du volume sonore à
-l'identique → `200`, valeur inchangée). Ce qui suit reste donc exact sur la
-forme, seule la cible est à trouver :
+Les commandes passent par la route **`action`**, jamais par `feature` :
 
 ```python
-client.set_iot_feature(
+client.set_iot_action(
     "BD1522206", "SweepingRobot", "0",
-    "SweeperTaskMgr", "CurrentTask",
-    {"taskState": "clean"},
+    "SweeperCleanTask", "CleanCtrl",
+    {"action": "start", "source": "mobile"},
 )
 ```
 
-Valeurs acceptées, extraites de l'énumération du schéma :
+Schéma de `CleanCtrl` (`sid=6`, `direction=Plt2Dev` — plateforme vers
+appareil, c'est le vrai canal de commande) :
 
-| `taskState` | Libellé d'origine | Usage |
-|---|---|---|
-| `standby` | 休息中 | au repos |
-| `clean` | 清洁中 | **démarrer le nettoyage** |
-| `cleanPause` | 清洁暂停中 | **mettre en pause** |
-| `cleanDoneRecharge` | 清洁完成回充 | **retour à la base** |
-| `dryingMop` | 烘干拖布中 | séchage de la serpillère |
-| `inspect` / `inspectPause` / `inspectDoneRecharge` | 巡检… | patrouille |
-| `remoteControl` | 遥控中 | pilotage manuel |
-| `fixedMotion` | 定点移动中 | déplacement ponctuel |
-| `continueCharging` | 电量低补电中 | recharge batterie faible |
+| `action` | Libellé d'origine |
+|---|---|
+| `start` | 开始全屋清洁 — démarrer le nettoyage complet |
+| `pause` | 暂停清洁 — mettre en pause |
+| `resume` | 继续清洁 — reprendre |
+| `stop` | 停止清洁 — arrêter |
 
-Ce qui ne marche **pas** :
+`source` vaut `mobile` (app) ou `smartSpeaker` (enceinte). `action` est requis,
+`source` non.
 
-- `/v3/iot-feature/action/…` → `设备功能未报备` (« fonction non déclarée »).
-  Tout passe par `feature`, jamais par `action`.
-- `set_device_feature_by_key()` → `itemKey不存在`. Cette route attend une clé
-  plate façon ampoule (`light_switch`), que le robot n'expose pas. Utiliser
-  `set_iot_feature()`.
-- Envelopper la valeur d'un scalaire dans un objet →
+> ⚠️ **`SweeperTaskMgr.CurrentTask` n'est PAS une commande.** C'est un miroir
+> d'état (`access=rwu`, le `u` pour *upload* : l'appareil le remonte). Y écrire
+> renvoie `200`, le robot ne bouge pas, et **l'objet entier est remplacé** dans
+> le cache du cloud — après un envoi de `{"taskState": …}`, la relecture ne
+> renvoie plus que ce champ. Le cache se répare seul, l'appareil republiant son
+> état toutes les ~4 s.
+
+### Ce qui a coûté du temps
+
+- Les commandes ne sont pas sur `feature` mais sur `action`, et il faut y
+  envoyer un `PUT`. Un `GET` sur une URL d'action répond **405 pour tout**,
+  y compris les noms inventés — ce qui masque complètement l'existence des
+  actions réelles. Sonder les actions **en PUT avec une valeur invalide**.
+- `set_device_feature_by_key()` ne marche pas ici → `itemKey不存在`. Cette
+  route attend une clé plate façon ampoule (`light_switch`), absente sur ce
+  modèle. Utiliser `set_iot_feature()` / `set_iot_action()`.
+- `forceCheck`, aperçu dans le `PropertyRequest`, n'est pas réglable par le
+  client : en paramètre d'URL il reste `null`, et dans le corps il est absorbé
+  par la valeur — le corps de la requête *est* la valeur.
+- Envelopper un scalaire dans un objet échoue :
   `$: object found, integer expected`. Pour `PromptToneVolume` on envoie `80`,
-  pas `{"PromptToneVolume": 80}`. Pour `CurrentTask`, qui est de type objet,
-  on envoie bien `{"taskState": …}`.
+  pas `{"PromptToneVolume": 80}`.
 
 ## La fuite de schéma
 
@@ -393,6 +387,15 @@ clavier (phase 2).
 
 ```bash
 python3 tools/ezviz_command.py [SERIAL]
+```
+
+### `tools/ezviz_go.py`
+
+Envoie les vraies commandes via `CleanCtrl`, chacune confirmée au clavier, puis
+cherche l'action de retour à la base.
+
+```bash
+python3 tools/ezviz_go.py [SERIAL]
 ```
 
 ### `tools/ezviz_try_action.py`
