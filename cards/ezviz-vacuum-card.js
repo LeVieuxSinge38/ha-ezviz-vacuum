@@ -1,7 +1,7 @@
-/* Carte aspirateur EZVIZ RE5 Plus.
-   Le robot et sa base d'auto-vidage sont dessinés, pas photographiés : le
-   dessin se recolore avec l'état et reste net à toute taille. Une vraie photo
-   peut le remplacer via `image`.
+/* Carte aspirateur EZVIZ RE5 Plus, format compact.
+   Une seule ligne : le robot, son état, sa batterie et les trois commandes.
+   L'entretien vit sous un chevron, replié par défaut — on le consulte une
+   fois par mois, il n'a rien à faire en permanence sur un tableau de bord.
    Toutes les tailles dérivent de --fs, réglable par font_scale. */
 
 const EVC_STATES = {
@@ -14,32 +14,20 @@ const EVC_STATES = {
   unavailable:{t:'Indisponible',     col:'rgba(150,150,150,.6)', busy:false}
 };
 
-/* Pannes remontées par le robot, traduites depuis l'énumération du firmware.
-   Seules les plus probables sont nommées ; les autres s'affichent brutes. */
+/* Pannes du firmware, traduites. Les absentes s'affichent telles quelles. */
 const EVC_FAULTS = {
-  CR_RollBrushTwine:'Brosse rotative enroulée',
-  CR_EdgeBrushTrapped:'Brosse latérale coincée',
-  CR_WheelTrapped:'Roue bloquée',
-  CR_WheelSuspended:'Roue dans le vide',
-  CR_Trapped:'Robot coincé',
-  CR_FailToReturnDock:'Retour à la base impossible',
-  CR_LocationFailure:'Perte de repérage',
-  CR_DustBoxOrBagUnset:'Bac à poussière absent',
-  CR_DustBoxUncover:'Bac à poussière ouvert',
-  CR_CleanWaterBoxEmpty:'Réservoir d’eau vide',
-  CR_CleanWaterBoxLow:'Réservoir d’eau bas',
-  CR_CleanWaterBoxUnsetup:'Réservoir d’eau absent',
-  CR_DirtyWaterBoxFull:'Bac à eau sale plein',
-  CR_DirtyWaterBoxUnsetup:'Bac à eau sale absent',
-  CR_AllWaterBoxUnsetup:'Réservoirs absents',
-  CR_MopInstallErr:'Serpillère mal installée',
-  CR_MopTryDrop:'Serpillère détachée',
-  CR_RollBrushUnsetup:'Brosse rotative absente',
-  CR_LidarCoverErr:'Capot du lidar obstrué',
-  CR_LidarShieldErr:'Lidar masqué',
-  CR_DockCommErr:'Base injoignable',
-  CR_DockDryFanStall:'Ventilateur de séchage bloqué',
-  CR_DockPumpSewageFail:'Vidange de la base impossible'
+  CR_RollBrushTwine:'Brosse enroulée', CR_EdgeBrushTrapped:'Brosse latérale coincée',
+  CR_WheelTrapped:'Roue bloquée', CR_WheelSuspended:'Roue dans le vide',
+  CR_Trapped:'Robot coincé', CR_FailToReturnDock:'Retour impossible',
+  CR_LocationFailure:'Perte de repérage', CR_DustBoxOrBagUnset:'Bac absent',
+  CR_DustBoxUncover:'Bac ouvert', CR_CleanWaterBoxEmpty:'Réservoir vide',
+  CR_CleanWaterBoxLow:'Réservoir bas', CR_CleanWaterBoxUnsetup:'Réservoir absent',
+  CR_DirtyWaterBoxFull:'Eau sale pleine', CR_DirtyWaterBoxUnsetup:'Bac eau sale absent',
+  CR_AllWaterBoxUnsetup:'Réservoirs absents', CR_MopInstallErr:'Serpillère mal posée',
+  CR_MopTryDrop:'Serpillère détachée', CR_RollBrushUnsetup:'Brosse absente',
+  CR_LidarCoverErr:'Lidar obstrué', CR_LidarShieldErr:'Lidar masqué',
+  CR_DockCommErr:'Base injoignable', CR_DockDryFanStall:'Séchage bloqué',
+  CR_DockPumpSewageFail:'Vidange impossible'
 };
 
 function evcNum(v){
@@ -50,7 +38,6 @@ function evcNum(v){
   return Number.isFinite(n) ? n : NaN;
 }
 
-/* Vert tant qu'il reste de la marge, rouge quand le remplacement approche. */
 function evcWearColor(w){
   if(isNaN(w)) return 'rgba(150,150,150,.7)';
   if(w >= 85) return '#f87171';
@@ -58,95 +45,41 @@ function evcWearColor(w){
   return '#34d399';
 }
 
-/* RE5 Plus vu de trois quarts, posé devant sa base d'auto-vidage.
-   Corps blanc, bandeau pare-chocs sombre, tourelle lidar décentrée vers
-   l'arrière, brosse latérale à trois bras. */
+/* RE5 Plus vu de dessus : à cette taille, le plan lit mieux qu'une
+   perspective. Coque blanche, tourelle lidar, pare-chocs sombre à l'avant,
+   brosse latérale à trois bras. L'anneau extérieur porte la couleur d'état. */
 const EVC_ART = `
-<svg viewBox="0 0 300 190" xmlns="http://www.w3.org/2000/svg">
+<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
   <defs>
-    <linearGradient id="evcShell" x1="0.2" y1="0" x2="0.6" y2="1">
-      <stop offset="0"    stop-color="#ffffff"/>
-      <stop offset="0.42" stop-color="#eef1f5"/>
-      <stop offset="1"    stop-color="#c3cad4"/>
-    </linearGradient>
-    <linearGradient id="evcRim" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#8c96a3"/>
-      <stop offset="1" stop-color="#39414c"/>
-    </linearGradient>
-    <linearGradient id="evcDock" x1="0" y1="0" x2="1" y2="0">
-      <stop offset="0"   stop-color="#f4f6f9"/>
-      <stop offset="0.55" stop-color="#dfe4ea"/>
-      <stop offset="1"   stop-color="#aeb6c1"/>
-    </linearGradient>
-    <linearGradient id="evcTurret" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#5b6572"/>
-      <stop offset="1" stop-color="#232a33"/>
-    </linearGradient>
-    <radialGradient id="evcShade" cx="0.5" cy="0.5" r="0.5">
-      <stop offset="0" stop-color="#000" stop-opacity=".45"/>
-      <stop offset="1" stop-color="#000" stop-opacity="0"/>
+    <radialGradient id="evcTop" cx="0.36" cy="0.3" r="0.78">
+      <stop offset="0"   stop-color="#ffffff"/>
+      <stop offset="0.55" stop-color="#e9edf2"/>
+      <stop offset="1"   stop-color="#b9c1cc"/>
     </radialGradient>
   </defs>
-
-  <!-- base d'auto-vidage -->
-  <g class="dock">
-    <ellipse cx="243" cy="150" rx="46" ry="11" fill="url(#evcShade)"/>
-    <path d="M215,150 L215,58 Q215,44 229,44 L257,44 Q271,44 271,58 L271,150 Z"
-          fill="url(#evcDock)"/>
-    <path d="M221,150 L221,64 Q221,54 231,54 L255,54 Q265,54 265,64 L265,150 Z"
-          fill="#0f141b" opacity=".13"/>
-    <rect x="226" y="70" width="34" height="42" rx="7" fill="#1a212a" opacity=".82"/>
-    <rect x="230" y="76" width="26" height="4" rx="2" fill="#8c96a3" opacity=".5"/>
-    <circle class="dled" cx="243" cy="126" r="3.6" fill="var(--vc)"/>
-    <path d="M209,150 L277,150 L281,158 L205,158 Z" fill="#c3cad4"/>
-  </g>
-
-  <!-- ombre portée du robot -->
-  <ellipse class="shade" cx="124" cy="152" rx="96" ry="16" fill="url(#evcShade)"/>
-
-  <!-- flanc puis plateau -->
-  <path d="M28,112 A96,50 0 0,0 220,112 L220,128 A96,50 0 0,1 28,128 Z"
-        fill="url(#evcRim)"/>
-  <ellipse cx="124" cy="112" rx="96" ry="50" fill="url(#evcShell)"/>
-  <ellipse cx="124" cy="112" rx="96" ry="50" fill="none"
-           stroke="#ffffff" stroke-opacity=".65" stroke-width="1.4"/>
-  <ellipse cx="124" cy="110" rx="80" ry="41" fill="none"
-           stroke="#9aa4b1" stroke-opacity=".28" stroke-width="1"/>
-
-  <!-- pare-chocs avant, sombre -->
-  <path d="M44,126 A96,50 0 0,0 204,126 L204,133 A96,50 0 0,1 44,133 Z"
-        fill="#222932"/>
-  <path class="ring" d="M46,124 A96,50 0 0,0 202,124"
-        fill="none" stroke="var(--vc)" stroke-width="4"
-        stroke-linecap="round"/>
-
-  <!-- tourelle lidar -->
-  <ellipse cx="146" cy="94" rx="24" ry="12" fill="#161c24" opacity=".45"/>
-  <path d="M122,80 L122,92 A24,12 0 0,0 170,92 L170,80 Z" fill="url(#evcTurret)"/>
-  <ellipse cx="146" cy="80" rx="24" ry="12" fill="#3b444f"/>
-  <ellipse cx="146" cy="79" rx="17" ry="8" fill="#141a21"/>
-  <ellipse class="lidar" cx="146" cy="79" rx="7" ry="3.4" fill="var(--vc)"/>
-
-  <!-- capteurs et bouton -->
-  <circle cx="86" cy="96" r="7" fill="#e3e8ee" stroke="#9aa4b1"
-          stroke-opacity=".5" stroke-width="1"/>
-  <circle cx="86" cy="96" r="3" fill="#8c96a3" opacity=".55"/>
-  <ellipse cx="70" cy="115" rx="5.5" ry="3" fill="#222932" opacity=".55"/>
-
-  <!-- brosse latérale -->
-  <g class="brush" transform="translate(56,138)">
-    <circle r="6" fill="#39414c"/>
-    <g stroke="#f8fafc" stroke-opacity=".9" stroke-width="2.3" stroke-linecap="round">
-      <path d="M0,0 L17,-6"/><path d="M0,0 L-8,15"/><path d="M0,0 L-11,-12"/>
+  <circle class="halo" cx="50" cy="50" r="47" fill="none"
+          stroke="var(--vc)" stroke-width="2.5" opacity=".35"/>
+  <circle cx="50" cy="50" r="41" fill="url(#evcTop)"/>
+  <circle cx="50" cy="50" r="41" fill="none" stroke="#ffffff"
+          stroke-opacity=".7" stroke-width="1.2"/>
+  <path d="M18,58 A41,41 0 0,0 82,58 L82,63 A41,41 0 0,1 18,63 Z"
+        fill="#232a33" opacity=".92"/>
+  <path class="sweep" d="M50,50 L50,9 A41,41 0 0,1 79,21 Z"
+        fill="var(--vc)" opacity="0"/>
+  <circle cx="50" cy="50" r="30" fill="none" stroke="#9aa4b1"
+          stroke-opacity=".25" stroke-width="1"/>
+  <circle cx="50" cy="38" r="12.5" fill="#39414c"/>
+  <circle cx="50" cy="38" r="8.5"  fill="#151b22"/>
+  <circle class="lidar" cx="50" cy="38" r="3.6" fill="var(--vc)"/>
+  <circle cx="30" cy="60" r="4" fill="#e3e8ee" stroke="#9aa4b1"
+          stroke-opacity=".45" stroke-width=".8"/>
+  <g class="brush" transform="translate(70,66)">
+    <circle r="4" fill="#39414c"/>
+    <g stroke="#f8fafc" stroke-opacity=".9" stroke-width="1.8"
+       stroke-linecap="round">
+      <path d="M0,0 L11,-4"/><path d="M0,0 L-5,10"/><path d="M0,0 L-7,-8"/>
     </g>
-    <circle r="2.4" fill="#cbd5e1"/>
-  </g>
-
-  <!-- poussière aspirée, visible en nettoyage -->
-  <g class="dust" fill="var(--vc)">
-    <circle cx="18"  cy="136" r="2.6"/>
-    <circle cx="6"   cy="124" r="1.9"/>
-    <circle cx="26"  cy="118" r="1.5"/>
+    <circle r="1.6" fill="#cbd5e1"/>
   </g>
 </svg>`;
 
@@ -155,6 +88,7 @@ class EzvizVacuumCard extends HTMLElement{
     super();
     this.attachShadow({mode:'open'});
     this._built = false;
+    this._open = false;
   }
 
   setConfig(cfg){
@@ -163,13 +97,14 @@ class EzvizVacuumCard extends HTMLElement{
       throw new Error('Cette carte attend une entité du domaine vacuum');
 
     this._cfg = Object.assign({
-      name:null, battery:null, fault:null, fan:null, image:null,
+      name:null, battery:null, fault:null, image:null,
       consumables:[], consumable_mode:'wear', show_hours:true,
-      art_opacity:1, font_scale:1
+      font_scale:1
     }, cfg);
     this._cons = (cfg.consumables || []).map(c =>
       typeof c === 'string' ? {entity:c, name:null}
                             : {entity:c.entity, name:c.name || null});
+    this._open = !!cfg.expanded;
 
     const art = this._cfg.image
       ? '<img src="' + this._cfg.image + '" alt="">'
@@ -180,7 +115,7 @@ class EzvizVacuumCard extends HTMLElement{
     :host{display:block}
     ha-card{
       position:relative;overflow:hidden;container-type:inline-size;
-      padding:16px 18px 15px;
+      padding:12px 14px;
       background:
         radial-gradient(130% 110% at 50% -25%, rgba(255,255,255,.08), transparent 62%),
         var(--ha-card-background, var(--card-background-color, #1c1c1c));
@@ -188,194 +123,172 @@ class EzvizVacuumCard extends HTMLElement{
     }
     ha-card::after{
       content:'';position:absolute;inset:0;border-radius:inherit;
-      pointer-events:none;border:1px solid var(--vc);opacity:.2;
+      pointer-events:none;border:1px solid var(--vc);opacity:.18;
     }
 
-    /* ---- en-tête : nom à gauche, pastille d'état à droite ---- */
-    .head{
-      display:flex;align-items:center;gap:10px;padding-bottom:12px;
-      border-bottom:1px solid var(--divider-color, rgba(127,127,127,.2));
+    .row{display:flex;align-items:center;gap:12px}
+
+    /* ---- le robot, petit et vivant ---- */
+    .art{
+      flex:none;width:calc(52px * var(--fs));height:calc(52px * var(--fs));
+      cursor:pointer;position:relative;
+      filter:drop-shadow(0 4px 9px rgba(0,0,0,.4));
     }
+    .art svg,.art img{display:block;width:100%;height:100%;
+      object-fit:cover;border-radius:50%}
+    .brush{transform-origin:70px 66px}
+    .busy .brush{animation:evc-spin .9s linear infinite}
+    @keyframes evc-spin{to{transform:translate(70px,66px) rotate(360deg)}}
+    .lidar{transition:opacity .3s}
+    .busy .lidar{animation:evc-pulse 1.4s ease-in-out infinite}
+    @keyframes evc-pulse{50%{opacity:.2}}
+    .busy .sweep{animation:evc-sweep 2.4s linear infinite;transform-origin:50px 50px}
+    @keyframes evc-sweep{
+      0%{opacity:.22;transform:rotate(0deg)}
+      100%{opacity:.22;transform:rotate(360deg)}
+    }
+    .halo{transition:opacity .4s}
+    .busy .halo{animation:evc-halo 2s ease-in-out infinite}
+    @keyframes evc-halo{50%{opacity:.85}}
+
+    /* ---- nom et état ---- */
+    .txt{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;gap:2px;
+      cursor:pointer}
     .nm{
-      flex:1 1 auto;min-width:0;
-      font-size:calc(1.02rem * var(--fs));font-weight:800;
-      letter-spacing:.13em;text-transform:uppercase;color:var(--vc);
-      text-shadow:0 0 18px color-mix(in srgb, var(--vc) 38%, transparent);
+      font-size:calc(.78rem * var(--fs));font-weight:800;letter-spacing:.13em;
+      text-transform:uppercase;color:var(--secondary-text-color);opacity:.72;
+      white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+    }
+    .stt{
+      display:flex;align-items:center;gap:7px;
+      font-size:calc(1.02rem * var(--fs));font-weight:700;color:var(--vc);
       white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
       transition:color .4s ease;
-    }
-    .pill{
-      flex:none;display:flex;align-items:center;gap:6px;
-      padding:5px 11px 5px 8px;border-radius:999px;
-      background:color-mix(in srgb, var(--vc) 16%, transparent);
-      box-shadow:inset 0 0 0 1px color-mix(in srgb, var(--vc) 40%, transparent);
-      font-size:calc(.82rem * var(--fs));font-weight:700;color:var(--vc);
-      white-space:nowrap;
     }
     .dot{width:7px;height:7px;border-radius:50%;background:var(--vc);flex:none}
     .busy .dot{animation:evc-dot 1.3s ease-in-out infinite}
     @keyframes evc-dot{50%{opacity:.25;transform:scale(.7)}}
-
-    /* ---- illustration ---- */
-    .art{
-      position:relative;margin:6px auto 2px;width:78%;max-width:330px;
-      opacity:var(--art-op);cursor:pointer;
-      filter:drop-shadow(0 14px 22px rgba(0,0,0,.42));
-    }
-    .art svg,.art img{display:block;width:100%;height:auto;border-radius:12px}
-    .art::before{
-      content:'';position:absolute;left:50%;top:56%;
-      transform:translate(-50%,-50%);width:112%;height:120%;
-      border-radius:50%;z-index:-1;
-      background:radial-gradient(circle,
-        color-mix(in srgb, var(--vc) 26%, transparent), transparent 66%);
-    }
-    .brush{transform-origin:56px 138px}
-    .busy .brush{animation:evc-spin 1s linear infinite}
-    @keyframes evc-spin{to{transform:translate(56px,138px) rotate(360deg)}}
-    .busy .lidar{animation:evc-pulse 1.5s ease-in-out infinite}
-    @keyframes evc-pulse{50%{opacity:.25}}
-    .busy .shade{animation:evc-hover 2.6s ease-in-out infinite}
-    @keyframes evc-hover{50%{transform:scale(.94);opacity:.72}}
-    .dust{opacity:0;transition:opacity .4s}
-    .busy .dust{opacity:.85;animation:evc-dust 1.4s ease-out infinite}
-    @keyframes evc-dust{
-      0%{opacity:0;transform:translate(-14px,10px) scale(.5)}
-      45%{opacity:.9}
-      100%{opacity:0;transform:translate(16px,-8px) scale(1.15)}
-    }
-    .dock{transition:opacity .5s}
-    .away .dock{opacity:.32}
-    .dled{transition:opacity .4s}
-
-    /* ---- bandeau de panne ---- */
-    .fault{
-      display:none;align-items:center;gap:9px;margin-top:12px;
-      padding:10px 12px;border-radius:12px;
-      background:color-mix(in srgb, #f87171 15%, transparent);
-      box-shadow:inset 0 0 0 1px color-mix(in srgb, #f87171 42%, transparent);
-      font-size:calc(.9rem * var(--fs));font-weight:700;color:#f87171;
-    }
-    .fault.on{display:flex}
-    .fault ha-icon{--mdc-icon-size:calc(20px * var(--fs));flex:none}
+    .stt.err{color:#f87171}
 
     /* ---- batterie ---- */
-    .bat{margin-top:14px}
-    .line{display:flex;align-items:baseline;gap:8px;margin-bottom:6px}
-    .line .k{
-      flex:1 1 auto;min-width:0;font-size:calc(.94rem * var(--fs));
-      font-weight:600;color:var(--secondary-text-color);
-      white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+    .bat{
+      flex:none;display:flex;align-items:center;gap:5px;
+      font-size:calc(1.02rem * var(--fs));font-weight:700;
+      color:var(--bc);font-variant-numeric:tabular-nums;
     }
-    .line .v{
-      flex:none;font-weight:700;font-variant-numeric:tabular-nums;
-      color:var(--bc, var(--primary-text-color));
-      font-size:calc(1.05rem * var(--fs));
-    }
-    .line .v small{font-size:calc(.8rem * var(--fs));opacity:.72;margin-left:1px}
-    .bat .line .v{font-size:calc(1.5rem * var(--fs));font-weight:680;
-      letter-spacing:-.015em}
-    .bar{height:7px;border-radius:999px;overflow:hidden;
-      background:color-mix(in srgb, var(--primary-text-color) 10%, transparent)}
-    .bar i{display:block;height:100%;border-radius:999px;
-      background:var(--bc);transition:width .6s ease, background .4s}
-
-    /* ---- consommables ---- */
-    .sec{
-      margin-top:15px;padding-top:12px;
-      border-top:1px solid var(--divider-color, rgba(127,127,127,.2));
-    }
-    .ch{
-      font-size:calc(.75rem * var(--fs));font-weight:800;letter-spacing:.12em;
-      text-transform:uppercase;color:var(--secondary-text-color);
-      opacity:.7;margin-bottom:10px;
-    }
-    .cons{display:flex;flex-direction:column;gap:9px}
+    .bat ha-icon{--mdc-icon-size:calc(19px * var(--fs))}
+    .bat small{font-size:calc(.78rem * var(--fs));opacity:.75;margin-left:-2px}
 
     /* ---- commandes ---- */
-    .btns{
-      display:flex;gap:8px;margin-top:15px;padding-top:13px;
-      border-top:1px solid var(--divider-color, rgba(127,127,127,.2));
-    }
+    .cmd{flex:none;display:flex;gap:6px}
     .b{
-      flex:1 1 0;min-width:0;border:0;cursor:pointer;font-family:inherit;
-      padding:12px 5px;border-radius:12px;
-      display:flex;align-items:center;justify-content:center;gap:7px;
-      background:color-mix(in srgb, var(--primary-text-color) 7%, transparent);
+      width:calc(38px * var(--fs));height:calc(38px * var(--fs));
+      border:0;border-radius:11px;cursor:pointer;padding:0;
+      display:flex;align-items:center;justify-content:center;
+      background:color-mix(in srgb, var(--primary-text-color) 8%, transparent);
       transition:background .18s, box-shadow .18s;
       -webkit-tap-highlight-color:transparent;
     }
     .b:hover:not(:disabled){
-      background:color-mix(in srgb, var(--primary-text-color) 13%, transparent)}
-    .b:disabled{opacity:.3;cursor:not-allowed}
-    .b ha-icon{--mdc-icon-size:calc(22px * var(--fs));
-      color:var(--secondary-text-color);flex:none;transition:color .18s}
-    .b span{
-      font-size:calc(.92rem * var(--fs));font-weight:700;
-      color:var(--secondary-text-color);transition:color .18s;
+      background:color-mix(in srgb, var(--primary-text-color) 15%, transparent)}
+    .b:disabled{opacity:.28;cursor:not-allowed}
+    .b ha-icon{--mdc-icon-size:calc(21px * var(--fs));
+      color:var(--secondary-text-color);transition:color .18s}
+    .b.on{
+      background:color-mix(in srgb, var(--bcol) 22%, transparent);
+      box-shadow:inset 0 0 0 1px color-mix(in srgb, var(--bcol) 50%, transparent);
+    }
+    .b.on ha-icon{color:var(--bcol)}
+    .chev{background:transparent;width:calc(28px * var(--fs))}
+    .chev ha-icon{transition:transform .3s ease}
+    .chev.open ha-icon{transform:rotate(180deg)}
+
+    /* ---- entretien, replié ---- */
+    .fold{
+      display:grid;grid-template-rows:0fr;
+      transition:grid-template-rows .32s ease;
+    }
+    .fold.open{grid-template-rows:1fr}
+    .foldin{overflow:hidden;min-height:0}
+    .cons{
+      display:grid;grid-template-columns:1fr 1fr;gap:9px 16px;
+      margin-top:12px;padding-top:11px;
+      border-top:1px solid var(--divider-color, rgba(127,127,127,.2));
+    }
+    .c .l{display:flex;align-items:baseline;gap:6px;margin-bottom:4px}
+    .c .k{
+      flex:1 1 auto;min-width:0;font-size:calc(.84rem * var(--fs));
+      font-weight:600;color:var(--secondary-text-color);
       white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
     }
-    .b.on{
-      background:color-mix(in srgb, var(--bcol) 20%, transparent);
-      box-shadow:inset 0 0 0 1px color-mix(in srgb, var(--bcol) 48%, transparent);
-    }
-    .b.on ha-icon,.b.on span{color:var(--bcol)}
+    .c .v{flex:none;font-size:calc(.88rem * var(--fs));font-weight:700;
+      color:var(--wc);font-variant-numeric:tabular-nums}
+    .c .v small{font-size:calc(.74rem * var(--fs));opacity:.7}
+    .bar{height:5px;border-radius:999px;overflow:hidden;
+      background:color-mix(in srgb, var(--primary-text-color) 10%, transparent)}
+    .bar i{display:block;height:100%;border-radius:999px;
+      transition:width .6s ease}
 
-    @container (max-width: 380px){
-      .art{width:92%}
-      .b span{display:none}
-      .pill .lbl{display:none}
-      .pill{padding:6px 9px}
+    @container (max-width: 430px){
+      .cons{grid-template-columns:1fr}
+      .nm{display:none}
+    }
+    @container (max-width: 330px){
+      .bat{display:none}
     }
     </style>
     <ha-card>
-      <div class="head">
-        <div class="nm"></div>
-        <div class="pill"><span class="dot"></span><span class="lbl"></span></div>
+      <div class="row">
+        <div class="art">` + art + `</div>
+        <div class="txt">
+          <div class="nm"></div>
+          <div class="stt"><span class="dot"></span><span class="lbl"></span></div>
+        </div>
+        <div class="bat"><ha-icon></ha-icon><span class="pct"></span></div>
+        <div class="cmd">
+          <button class="b go"    style="--bcol:#34d399" title="Démarrer">
+            <ha-icon icon="mdi:play"></ha-icon></button>
+          <button class="b pause" style="--bcol:#fbbf24" title="Pause">
+            <ha-icon icon="mdi:pause"></ha-icon></button>
+          <button class="b home"  style="--bcol:#38bdf8" title="Retour à la base">
+            <ha-icon icon="mdi:home-import-outline"></ha-icon></button>
+          <button class="b chev" title="Entretien">
+            <ha-icon icon="mdi:chevron-down"></ha-icon></button>
+        </div>
       </div>
-      <div class="art">` + art + `</div>
-      <div class="fault"><ha-icon icon="mdi:alert-circle"></ha-icon><span></span></div>
-      <div class="bat">
-        <div class="line"><span class="k"></span><span class="v"></span></div>
-        <div class="bar"><i></i></div>
-      </div>
-      <div class="sec cons-sec">
-        <div class="ch">Entretien</div>
-        <div class="cons"></div>
-      </div>
-      <div class="btns">
-        <button class="b go"    style="--bcol:#34d399">
-          <ha-icon icon="mdi:play"></ha-icon><span>Démarrer</span></button>
-        <button class="b pause" style="--bcol:#fbbf24">
-          <ha-icon icon="mdi:pause"></ha-icon><span>Pause</span></button>
-        <button class="b home"  style="--bcol:#38bdf8">
-          <ha-icon icon="mdi:home-import-outline"></ha-icon><span>Base</span></button>
-      </div>
+      <div class="fold"><div class="foldin"><div class="cons"></div></div></div>
     </ha-card>`;
 
     const r = this.shadowRoot;
     this._el = {
-      card:r.querySelector('ha-card'), nm:r.querySelector('.nm'),
-      pill:r.querySelector('.pill'), lbl:r.querySelector('.pill .lbl'),
-      art:r.querySelector('.art'),
-      fault:r.querySelector('.fault'), faultTxt:r.querySelector('.fault span'),
-      batK:r.querySelector('.bat .k'), batV:r.querySelector('.bat .v'),
-      batBar:r.querySelector('.bat .bar i'),
-      consSec:r.querySelector('.cons-sec'), cons:r.querySelector('.cons'),
+      card:r.querySelector('ha-card'), art:r.querySelector('.art'),
+      nm:r.querySelector('.nm'), stt:r.querySelector('.stt'),
+      lbl:r.querySelector('.lbl'), bat:r.querySelector('.bat'),
+      batIcon:r.querySelector('.bat ha-icon'), pct:r.querySelector('.pct'),
       go:r.querySelector('.go'), pause:r.querySelector('.pause'),
-      home:r.querySelector('.home')
+      home:r.querySelector('.home'), chev:r.querySelector('.chev'),
+      fold:r.querySelector('.fold'), cons:r.querySelector('.cons')
     };
-    this._el.card.style.setProperty('--art-op', String(this._cfg.art_opacity));
     this._el.card.style.setProperty('--fs', String(this._cfg.font_scale));
 
     this._el.go.addEventListener('click', () => this._call('start'));
     this._el.pause.addEventListener('click', () => this._call('pause'));
     this._el.home.addEventListener('click', () => this._call('return_to_base'));
-    this._el.art.addEventListener('click', () => {
+    this._el.chev.addEventListener('click', () => {
+      this._open = !this._open;
+      this._el.fold.classList.toggle('open', this._open);
+      this._el.chev.classList.toggle('open', this._open);
+    });
+    const more = () => {
       const ev = new Event('hass-more-info', {bubbles:true, composed:true});
       ev.detail = {entityId:this._cfg.entity};
       this.dispatchEvent(ev);
-    });
+    };
+    this._el.art.addEventListener('click', more);
+    r.querySelector('.txt').addEventListener('click', more);
+
+    this._el.fold.classList.toggle('open', this._open);
+    this._el.chev.classList.toggle('open', this._open);
     this._built = true;
   }
 
@@ -386,28 +299,20 @@ class EzvizVacuumCard extends HTMLElement{
 
   set hass(h){ this._hass = h; if(this._built) this._paint(); }
 
-  /* Une ligne de consommable : libellé, valeur, barre d'usure. */
-  _consRow(label, value, pct, color){
-    return '<div><div class="line"><span class="k">' + label + '</span>' +
-      '<span class="v" style="--bc:' + color + '">' + value + '</span></div>' +
-      '<div class="bar"><i style="width:' + pct + '%;background:' + color +
-      '"></i></div></div>';
-  }
-
   _paint(){
     const c = this._cfg, e = this._el;
     const st = this._hass.states[c.entity];
     const state = st ? st.state : 'unavailable';
-    const info = EVC_STATES[state] || {t:state, col:'rgba(150,150,150,.85)', busy:false};
+    const info = EVC_STATES[state] ||
+      {t:state, col:'rgba(150,150,150,.85)', busy:false};
 
     e.card.style.setProperty('--vc', info.col);
     e.nm.textContent = c.name || (st ? st.attributes.friendly_name : 'Aspirateur');
-    e.lbl.textContent = info.t;
-    e.pill.classList.toggle('busy', info.busy);
+    e.card.classList.toggle('busy', info.busy);
     e.art.classList.toggle('busy', info.busy);
-    e.art.classList.toggle('away', state !== 'docked');
+    e.stt.classList.toggle('busy', info.busy);
 
-    /* ---- panne ---- */
+    /* Une panne remplace l'état : c'est l'information qui prime. */
     let fault = '';
     if(c.fault){
       const fs = this._hass.states[c.fault];
@@ -415,8 +320,8 @@ class EzvizVacuumCard extends HTMLElement{
           String(fs.state).toLowerCase()))
         fault = EVC_FAULTS[fs.state] || fs.state;
     }
-    e.fault.classList.toggle('on', !!fault);
-    e.faultTxt.textContent = fault;
+    e.lbl.textContent = fault || info.t;
+    e.stt.classList.toggle('err', !!fault);
 
     /* ---- batterie ---- */
     let pct = NaN;
@@ -428,13 +333,16 @@ class EzvizVacuumCard extends HTMLElement{
     const charging = !!(st && st.attributes.in_charging) && pct < 100;
     const bcol = isNaN(pct) ? 'rgba(150,150,150,.7)'
       : pct <= 20 ? '#f87171' : pct <= 50 ? '#fbbf24' : '#34d399';
-    e.batK.textContent = 'Batterie' + (charging ? '  ⚡ en charge' : '');
-    e.batV.style.setProperty('--bc', bcol);
-    e.batV.innerHTML = (isNaN(pct) ? '—' : Math.round(pct)) + '<small>%</small>';
-    e.batBar.style.width = (isNaN(pct) ? 0 : Math.max(0, Math.min(100, pct))) + '%';
-    e.batBar.style.background = bcol;
+    const lvl = isNaN(pct) ? null : Math.round(pct / 10) * 10;
+    e.batIcon.setAttribute('icon', isNaN(pct) ? 'mdi:battery-unknown'
+      : charging ? 'mdi:battery-charging'
+      : lvl >= 100 ? 'mdi:battery'
+      : lvl <= 0 ? 'mdi:battery-outline'
+      : 'mdi:battery-' + lvl);
+    e.bat.style.setProperty('--bc', bcol);
+    e.pct.innerHTML = (isNaN(pct) ? '—' : Math.round(pct)) + '<small>%</small>';
 
-    /* ---- consommables ----
+    /* ---- entretien ----
        Le capteur donne les heures restantes, son attribut les heures faites :
        leur somme est la durée de vie totale, d'où l'usure. */
     const wearMode = c.consumable_mode !== 'remaining';
@@ -444,27 +352,30 @@ class EzvizVacuumCard extends HTMLElement{
       const label = cons.name ||
         (cs ? String(cs.attributes.friendly_name || cons.entity)
                 .replace(/^RE5 Plus\s+/i, '') : cons.entity);
-      if(!cs || ['unavailable','unknown'].includes(cs.state)){
-        rows += this._consRow(label, '—', 0, 'rgba(150,150,150,.7)');
-        continue;
+      let val = '—', pctBar = 0, col = 'rgba(150,150,150,.7)';
+      if(cs && !['unavailable','unknown'].includes(cs.state)){
+        const remain = evcNum(cs.state);
+        const used = evcNum(cs.attributes.hours_used);
+        const total = (!isNaN(remain) && !isNaN(used)) ? remain + used : NaN;
+        if(!isNaN(total) && total > 0){
+          const wear = Math.round((used / total) * 100);
+          const shown = wearMode ? wear : 100 - wear;
+          col = evcWearColor(wear);
+          pctBar = shown;
+          val = shown + '<small>%</small>' +
+            (c.show_hours ? ' <small>· ' + Math.round(remain) + ' h</small>' : '');
+        }else if(!isNaN(remain)){
+          val = Math.round(remain) + '<small> h</small>';
+        }
       }
-      const remain = evcNum(cs.state);
-      const used = evcNum(cs.attributes.hours_used);
-      const total = (!isNaN(remain) && !isNaN(used)) ? remain + used : NaN;
-      if(!isNaN(total) && total > 0){
-        const wear = Math.round((used / total) * 100);
-        const shown = wearMode ? wear : 100 - wear;
-        const hours = c.show_hours
-          ? ' <small>· ' + Math.round(remain) + ' h</small>' : '';
-        rows += this._consRow(label, shown + '<small>%</small>' + hours,
-                              shown, evcWearColor(wear));
-      }else if(!isNaN(remain)){
-        rows += this._consRow(label, Math.round(remain) + '<small> h</small>',
-                              0, 'rgba(150,150,150,.7)');
-      }
+      rows += '<div class="c" style="--wc:' + col + '">' +
+        '<div class="l"><span class="k">' + label + '</span>' +
+        '<span class="v">' + val + '</span></div>' +
+        '<div class="bar"><i style="width:' + pctBar + '%;background:' +
+        col + '"></i></div></div>';
     }
     e.cons.innerHTML = rows;
-    e.consSec.style.display = rows ? '' : 'none';
+    e.chev.style.display = rows ? '' : 'none';
 
     /* ---- commandes ---- */
     const dead = !st || state === 'unavailable';
@@ -476,7 +387,7 @@ class EzvizVacuumCard extends HTMLElement{
     e.home.classList.toggle('on', state === 'returning' || state === 'docked');
   }
 
-  getCardSize(){ return 6; }
+  getCardSize(){ return 2; }
   static getStubConfig(){ return {entity:'vacuum.robot'}; }
 }
 
@@ -490,6 +401,6 @@ if(!customElements.get('maison-vacuum-card'))
 window.customCards = window.customCards || [];
 window.customCards.push({
   type:'ezviz-vacuum-card', name:'EZVIZ — Aspirateur',
-  description:'Robot et base dessines, etat, batterie, usure et commandes',
+  description:'Format compact : etat, batterie, commandes, entretien repliable',
   preview:true
 });
