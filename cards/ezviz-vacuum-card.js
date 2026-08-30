@@ -4,23 +4,24 @@
    fois par mois, il n'a rien à faire en permanence sur un tableau de bord.
    Toutes les tailles dérivent de --fs, réglable par font_scale. */
 
-/* Palette inspirée du logo EZVIZ — ses pétales vont du bleu profond au cyan.
-   Les codes officiels n'ont pas pu être vérifiés (sites de marque
-   inaccessibles) : ce sont des teintes de la même famille, réglables par
-   l'option `palette`. */
-const EVC_BLUE = '#0f7fd4';   // bleu principal
-const EVC_CYAN = '#22c3e6';   // cyan clair, le plus vif du logo
-const EVC_TEAL = '#17b8a6';   // turquoise
-const EVC_AMBER = '#f2a93b';  // pause : code universel, hors palette
-const EVC_RED  = '#e5484d';   // panne : idem
+/* Palette du logo EZVIZ : quatre pétales — bleu, vert, jaune, magenta — et
+   un gris de mot-clé. Relevés sur le logo couleur, pas sur une charte
+   officielle : ils restent réglables par l'option `palette`.
+   Toute la carte n'utilise que ces quatre teintes, le gris servant aux
+   états neutres. */
+const EVC_BLUE    = '#0a84d8';  // pétale bleu
+const EVC_CYAN    = '#22b9e0';  // bord clair du pétale bleu
+const EVC_GREEN   = '#8cc63e';  // pétale vert
+const EVC_YELLOW  = '#ffc60b';  // pétale jaune
+const EVC_MAGENTA = '#e6007e';  // pétale magenta
 
 const EVC_STATES = {
-  cleaning:   {t:'En nettoyage',     col:EVC_CYAN,  busy:true},
-  returning:  {t:'Retour à la base', col:EVC_BLUE,  busy:true},
-  paused:     {t:'En pause',         col:EVC_AMBER, busy:false},
-  docked:     {t:'À la base',        col:EVC_TEAL,  busy:false},
+  cleaning:   {t:'En nettoyage',     col:EVC_GREEN,   busy:true},
+  returning:  {t:'Retour à la base', col:EVC_BLUE,    busy:true},
+  paused:     {t:'En pause',         col:EVC_YELLOW,  busy:false},
+  docked:     {t:'À la base',        col:EVC_CYAN,    busy:false},
   idle:       {t:"À l'arrêt",        col:'rgba(150,150,150,.85)', busy:false},
-  error:      {t:'Erreur',           col:EVC_RED,   busy:false},
+  error:      {t:'Erreur',           col:EVC_MAGENTA, busy:false},
   unavailable:{t:'Indisponible',     col:'rgba(150,150,150,.6)', busy:false}
 };
 
@@ -48,12 +49,13 @@ function evcNum(v){
   return Number.isFinite(n) ? n : NaN;
 }
 
-/* Usure : turquoise tant qu'il reste de la marge, puis ambre, puis rouge. */
+/* Usure : vert tant qu'il reste de la marge, puis jaune, puis magenta —
+   les trois pétales du logo, dans l'ordre où on les lit. */
 function evcWearColor(w){
   if(isNaN(w)) return 'rgba(150,150,150,.7)';
-  if(w >= 85) return EVC_RED;
-  if(w >= 65) return EVC_AMBER;
-  return EVC_TEAL;
+  if(w >= 85) return EVC_MAGENTA;
+  if(w >= 65) return EVC_YELLOW;
+  return EVC_GREEN;
 }
 
 /* RE5 Plus vu de dessus : à cette taille, le plan lit mieux qu'une
@@ -137,15 +139,25 @@ class EzvizVacuumCard extends HTMLElement{
     <style>
     :host{
       display:block;
-      --ez-blue: #0f7fd4;
-      --ez-cyan: #22c3e6;
-      --ez-teal: #17b8a6;
+      --ez-blue: #0a84d8;
+      --ez-cyan: #22b9e0;
+      --ez-green: #8cc63e;
+      --ez-yellow: #ffc60b;
+      --ez-magenta: #e6007e;
     }
     ha-card{
       position:relative;overflow:hidden;container-type:inline-size;
       padding:16px 18px;
       background:
         radial-gradient(130% 110% at 50% -25%, rgba(255,255,255,.08), transparent 62%),
+        radial-gradient(70% 130% at 0% 0%,
+          color-mix(in srgb, var(--ez-blue) 13%, transparent), transparent 70%),
+        radial-gradient(60% 120% at 38% 100%,
+          color-mix(in srgb, var(--ez-green) 10%, transparent), transparent 70%),
+        radial-gradient(65% 130% at 100% 100%,
+          color-mix(in srgb, var(--ez-magenta) 11%, transparent), transparent 70%),
+        radial-gradient(55% 110% at 82% 0%,
+          color-mix(in srgb, var(--ez-yellow) 9%, transparent), transparent 70%),
         var(--ha-card-background, var(--card-background-color, #1c1c1c));
       border-radius:var(--ha-card-border-radius, 16px);
     }
@@ -153,13 +165,15 @@ class EzvizVacuumCard extends HTMLElement{
       content:'';position:absolute;inset:0;border-radius:inherit;
       pointer-events:none;border:1px solid var(--vc);opacity:.22;
     }
-    /* Filet de marque en haut de carte : les trois teintes du logo. */
+    /* Filet de marque en haut de carte : les quatre pétales du logo,
+       dans l'ordre où ils tournent. */
     ha-card::before{
       content:'';position:absolute;top:0;left:0;right:0;height:3px;
       pointer-events:none;
       background:linear-gradient(90deg,
-        var(--ez-blue), var(--ez-cyan) 45%, var(--ez-teal));
-      opacity:.9;
+        var(--ez-blue), var(--ez-cyan) 26%, var(--ez-green) 52%,
+        var(--ez-yellow) 76%, var(--ez-magenta));
+      opacity:.95;
     }
 
     .row{display:flex;align-items:center;gap:16px}
@@ -221,8 +235,17 @@ class EzvizVacuumCard extends HTMLElement{
       cursor:pointer}
     .nm{
       font-size:calc(.82rem * var(--fs));font-weight:800;letter-spacing:.13em;
-      text-transform:uppercase;color:var(--ez-blue);opacity:.95;
+      text-transform:uppercase;opacity:.95;
       white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+      /* Le nom porte le dégradé complet : la marque est là, sans un aplat
+         de couleur de plus. La propriete color reste la solution de repli si le
+         navigateur ignore background-clip. */
+      color:var(--ez-blue);
+      background:linear-gradient(90deg,
+        var(--ez-blue), var(--ez-green) 42%, var(--ez-yellow) 68%,
+        var(--ez-magenta));
+      -webkit-background-clip:text;background-clip:text;
+      -webkit-text-fill-color:transparent;
     }
     .stt{
       display:flex;align-items:center;gap:7px;
@@ -233,7 +256,7 @@ class EzvizVacuumCard extends HTMLElement{
     .dot{width:8px;height:8px;border-radius:50%;background:var(--vc);flex:none}
     .busy .dot{animation:evc-dot 1.3s ease-in-out infinite}
     @keyframes evc-dot{50%{opacity:.25;transform:scale(.7)}}
-    .stt.err{color:#e5484d}
+    .stt.err{color:var(--ez-magenta)}
 
     /* ---- batterie ---- */
     .bat{
@@ -265,7 +288,7 @@ class EzvizVacuumCard extends HTMLElement{
     }
     .b.on ha-icon{color:var(--bcol)}
     .chev{background:transparent;width:calc(28px * var(--fs))}
-    .chev ha-icon{color:var(--ez-cyan)}
+    .chev ha-icon{color:var(--ez-magenta)}
     .chev ha-icon{transition:transform .3s ease}
     .chev.open ha-icon{transform:rotate(180deg)}
 
@@ -324,11 +347,11 @@ class EzvizVacuumCard extends HTMLElement{
         </div>
         <div class="bat"><ha-icon></ha-icon><span class="pct"></span></div>
         <div class="cmd">
-          <button class="b go"    style="--bcol:#22c3e6" title="Démarrer">
+          <button class="b go"    style="--bcol:var(--ez-green)" title="Démarrer">
             <ha-icon icon="mdi:play"></ha-icon></button>
-          <button class="b pause" style="--bcol:#f2a93b" title="Pause">
+          <button class="b pause" style="--bcol:var(--ez-yellow)" title="Pause">
             <ha-icon icon="mdi:pause"></ha-icon></button>
-          <button class="b home"  style="--bcol:#0f7fd4" title="Retour à la base">
+          <button class="b home"  style="--bcol:var(--ez-blue)" title="Retour à la base">
             <ha-icon icon="mdi:home-import-outline"></ha-icon></button>
           <button class="b chev" title="Entretien">
             <ha-icon icon="mdi:chevron-down"></ha-icon></button>
@@ -350,10 +373,10 @@ class EzvizVacuumCard extends HTMLElement{
     };
     this._el.card.style.setProperty('--fs', String(this._cfg.font_scale));
     this._el.card.style.setProperty('--art', this._cfg.art_size + 'px');
-    /* `palette: {blue, cyan, teal}` permet d'ajuster les teintes de marque
-       sans toucher au code. */
+    /* `palette: {blue, cyan, green, yellow, magenta}` permet d'ajuster les
+       teintes de marque sans toucher au code. */
     const pal = this._cfg.palette || {};
-    for(const k of ['blue', 'cyan', 'teal'])
+    for(const k of ['blue', 'cyan', 'green', 'yellow', 'magenta'])
       if(pal[k]) this.style.setProperty('--ez-' + k, pal[k]);
     this._el.art.classList.toggle('photo', this._photo);
 
@@ -481,7 +504,7 @@ class EzvizVacuumCard extends HTMLElement{
     if(isNaN(pct) && st) pct = evcNum(st.attributes.battery_level);
     const charging = !!(st && st.attributes.in_charging) && pct < 100;
     const bcol = isNaN(pct) ? 'rgba(150,150,150,.7)'
-      : pct <= 20 ? EVC_RED : pct <= 50 ? EVC_AMBER : EVC_TEAL;
+      : pct <= 20 ? EVC_MAGENTA : pct <= 50 ? EVC_YELLOW : EVC_GREEN;
     const lvl = isNaN(pct) ? null : Math.round(pct / 10) * 10;
     e.batIcon.setAttribute('icon', isNaN(pct) ? 'mdi:battery-unknown'
       : charging ? 'mdi:battery-charging'
