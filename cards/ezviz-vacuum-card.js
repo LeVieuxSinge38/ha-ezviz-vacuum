@@ -184,7 +184,7 @@ class EzvizVacuumCard extends HTMLElement{
     @keyframes evc-halo{50%{opacity:.85}}
 
     /* ---- nom et état ---- */
-    .txt{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;gap:2px;
+    .txt{flex:1 1 0;min-width:110px;display:flex;flex-direction:column;gap:2px;
       cursor:pointer}
     .nm{
       font-size:calc(.82rem * var(--fs));font-weight:800;letter-spacing:.13em;
@@ -214,8 +214,8 @@ class EzvizVacuumCard extends HTMLElement{
     /* ---- commandes ---- */
     .cmd{flex:none;display:flex;gap:6px}
     .b{
-      width:calc(44px * var(--fs));height:calc(44px * var(--fs));
-      border:0;border-radius:13px;cursor:pointer;padding:0;
+      width:calc(40px * var(--fs));height:calc(40px * var(--fs));
+      border:0;border-radius:12px;cursor:pointer;padding:0;
       display:flex;align-items:center;justify-content:center;
       background:color-mix(in srgb, var(--primary-text-color) 8%, transparent);
       transition:background .18s, box-shadow .18s;
@@ -224,7 +224,7 @@ class EzvizVacuumCard extends HTMLElement{
     .b:hover:not(:disabled){
       background:color-mix(in srgb, var(--primary-text-color) 15%, transparent)}
     .b:disabled{opacity:.28;cursor:not-allowed}
-    .b ha-icon{--mdc-icon-size:calc(24px * var(--fs));
+    .b ha-icon{--mdc-icon-size:calc(22px * var(--fs));
       color:var(--secondary-text-color);transition:color .18s}
     .b.on{
       background:color-mix(in srgb, var(--bcol) 22%, transparent);
@@ -261,14 +261,20 @@ class EzvizVacuumCard extends HTMLElement{
     .bar i{display:block;height:100%;border-radius:999px;
       transition:width .6s ease}
 
-    @container (max-width: 430px){
+    /* Carte étroite : les commandes passent sur leur propre ligne et
+       s'étirent. Le texte récupère toute la largeur au lieu d'être tronqué,
+       et les boutons deviennent des cibles bien plus confortables. */
+    @container (max-width: 580px){
+      .row{flex-wrap:wrap}
+      .cmd{width:100%;gap:8px;margin-top:12px}
+      .b{flex:1 1 0;width:auto}
+      .chev{flex:0 0 calc(46px * var(--fs))}
+    }
+    @container (max-width: 400px){
       .cons{grid-template-columns:1fr}
       .nm{display:none}
-      .art{width:calc(var(--art) * .7);height:calc(var(--art) * .7)}
-      .art.photo{width:calc(var(--art) * .82)}
-    }
-    @container (max-width: 330px){
-      .bat{display:none}
+      .art{width:calc(var(--art) * .78);height:calc(var(--art) * .78)}
+      .art.photo{width:calc(var(--art) * .9)}
     }
     </style>
     <ha-card>
