@@ -106,7 +106,7 @@ class EzvizVacuumCard extends HTMLElement{
       name:null, battery:null, fault:null,
       image:null, image_docked:null,
       consumables:[], consumable_mode:'wear', show_hours:true,
-      font_scale:1, art_size:96
+      font_scale:1, art_size:96, image_round:true
     }, cfg);
     this._cons = (cfg.consumables || []).map(c =>
       typeof c === 'string' ? {entity:c, name:null}
@@ -149,6 +149,11 @@ class EzvizVacuumCard extends HTMLElement{
     .art img{display:block;width:100%;height:100%;
       object-fit:contain;border-radius:10px}
     .art.photo{width:calc(var(--art) * 1.18)}
+    /* Le robot vu de dessus est rond : un cadrage circulaire fait disparaître
+       les coins blancs de la photo produit, et le balayage vient alors
+       épouser exactement le bord de la coque. */
+    .art.round{width:var(--art)}
+    .art.round img{object-fit:cover;border-radius:50%}
 
     /* Balayage du lidar, superposé à la photo pendant le travail. */
     .scan{
@@ -414,6 +419,10 @@ class EzvizVacuumCard extends HTMLElement{
       const want = (state === 'docked' && c.image_docked)
         ? c.image_docked
         : (c.image || c.image_docked);
+      /* Cadrage rond réservé à la vue de dessus : celle sur la base est plus
+         large que haute, un cercle lui couperait la station. */
+      e.art.classList.toggle('round',
+        c.image_round !== false && !!c.image && want === c.image);
       if(want !== this._curId) this._applyPhoto(want);
     }
 
