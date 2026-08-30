@@ -9,11 +9,11 @@
    officielle : ils restent réglables par l'option `palette`.
    Toute la carte n'utilise que ces quatre teintes, le gris servant aux
    états neutres. */
-const EVC_BLUE    = '#0a84d8';  // pétale bleu
-const EVC_CYAN    = '#22b9e0';  // bord clair du pétale bleu
-const EVC_GREEN   = '#8cc63e';  // pétale vert
-const EVC_YELLOW  = '#ffc60b';  // pétale jaune
-const EVC_MAGENTA = '#e6007e';  // pétale magenta
+const EVC_BLUE    = '#1d9cd8';  // pétale bleu
+const EVC_CYAN    = '#4cc3ec';  // bord clair du pétale bleu
+const EVC_GREEN   = '#8cc63f';  // pétale vert
+const EVC_YELLOW  = '#f5b21f';  // pétale jaune
+const EVC_MAGENTA = '#ec008c';  // pétale magenta
 
 const EVC_STATES = {
   cleaning:   {t:'En nettoyage',     col:EVC_GREEN,   busy:true},
@@ -139,11 +139,11 @@ class EzvizVacuumCard extends HTMLElement{
     <style>
     :host{
       display:block;
-      --ez-blue: #0a84d8;
-      --ez-cyan: #22b9e0;
-      --ez-green: #8cc63e;
-      --ez-yellow: #ffc60b;
-      --ez-magenta: #e6007e;
+      --ez-blue: #1d9cd8;
+      --ez-cyan: #4cc3ec;
+      --ez-green: #8cc63f;
+      --ez-yellow: #f5b21f;
+      --ez-magenta: #ec008c;
     }
     ha-card{
       position:relative;overflow:hidden;container-type:inline-size;
