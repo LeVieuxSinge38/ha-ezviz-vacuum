@@ -191,6 +191,7 @@ class EzvizVacuum(EzvizVacuumBaseEntity, StateVacuumEntity):
             self._serial,
             mode,
             self._data.get("std_clean"),
+            refresh_slow=True,
         )
 
     # ------------------------------------------------------------------
@@ -290,6 +291,7 @@ class EzvizVacuum(EzvizVacuumBaseEntity, StateVacuumEntity):
             self._data.get("room_cfg"),
             self._data.get("std_clean"),
             map_id,
+            refresh_slow=True,
         )
 
     def _active_map_id(self) -> int | None:

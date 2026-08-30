@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from typing import Any
 
@@ -36,6 +37,9 @@ class EzvizVacuumCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
         self.devices = devices
         self._cycle = 0
         self._slow: dict[str, dict[str, Any]] = {}
+        #: Armé après une écriture qui touche les données lentes, pour ne pas
+        #: attendre le prochain cycle long avant de les relire.
+        self._force_slow = False
 
     async def _async_update_data(self) -> dict[str, dict[str, Any]]:
         try:
@@ -44,7 +48,8 @@ class EzvizVacuumCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
             raise UpdateFailed(f"Relevé EZVIZ impossible : {err}") from err
 
     def _fetch(self) -> dict[str, dict[str, Any]]:
-        refresh_slow = self._cycle % SLOW_EVERY == 0
+        refresh_slow = self._force_slow or self._cycle % SLOW_EVERY == 0
+        self._force_slow = False
         self._cycle += 1
 
         result: dict[str, dict[str, Any]] = {}
@@ -56,11 +61,17 @@ class EzvizVacuumCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
             result[serial] = data
         return result
 
-    async def async_send(self, func, *args) -> None:
+    async def async_send(self, func, *args, refresh_slow: bool = False) -> None:
         """Exécute une commande puis rafraîchit l'état.
 
-        Le robot met quelques secondes à publier son nouvel état ; un premier
-        relevé immédiat renverrait encore l'ancien.
+        `refresh_slow` force la relecture des données lentes — puissance
+        d'aspiration, configuration des pièces. Sans lui, l'interface
+        continuerait d'afficher l'ancienne valeur jusqu'au prochain cycle
+        long, donnant l'impression que le réglage n'a pas pris.
         """
         await self.hass.async_add_executor_job(func, *args)
+        if refresh_slow:
+            self._force_slow = True
+            # Le cloud met un instant à publier la nouvelle valeur.
+            await asyncio.sleep(2)
         await self.async_request_refresh()

@@ -78,6 +78,18 @@ Assistant, redémarrer, puis ajouter l'intégration.
 Les identifiants du compte EZVIZ, ceux de l'application mobile. La double
 authentification n'est pas encore prise en charge.
 
+## Rythme de relevé
+
+Deux cadences, pour ne pas marteler le cloud EZVIZ :
+
+- **toutes les 30 s** : tâche en cours et batterie
+- **toutes les 5 min** : consommables, cartes, pièces, puissance d'aspiration
+
+Une écriture qui touche la seconde catégorie — puissance d'aspiration,
+nettoyage par pièce — force la relecture immédiatement. Sans cela l'interface
+afficherait l'ancienne valeur pendant plusieurs minutes et le réglage
+paraîtrait n'avoir aucun effet.
+
 ## Limites connues
 
 - **Cloud uniquement.** Aucune commande locale : sans Internet, rien ne
