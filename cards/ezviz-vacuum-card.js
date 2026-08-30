@@ -103,7 +103,7 @@ class EzvizVacuumCard extends HTMLElement{
       name:null, battery:null, fault:null,
       image:null, image_docked:null,
       consumables:[], consumable_mode:'wear', show_hours:true,
-      font_scale:1
+      font_scale:1, art_size:96
     }, cfg);
     this._cons = (cfg.consumables || []).map(c =>
       typeof c === 'string' ? {entity:c, name:null}
@@ -123,7 +123,7 @@ class EzvizVacuumCard extends HTMLElement{
     :host{display:block}
     ha-card{
       position:relative;overflow:hidden;container-type:inline-size;
-      padding:12px 14px;
+      padding:16px 18px;
       background:
         radial-gradient(130% 110% at 50% -25%, rgba(255,255,255,.08), transparent 62%),
         var(--ha-card-background, var(--card-background-color, #1c1c1c));
@@ -134,18 +134,18 @@ class EzvizVacuumCard extends HTMLElement{
       pointer-events:none;border:1px solid var(--vc);opacity:.18;
     }
 
-    .row{display:flex;align-items:center;gap:12px}
+    .row{display:flex;align-items:center;gap:16px}
 
-    /* ---- le robot, petit et vivant ---- */
+    /* ---- le robot, mis en avant ---- */
     .art{
-      flex:none;width:calc(52px * var(--fs));height:calc(52px * var(--fs));
+      flex:none;width:var(--art);height:var(--art);
       cursor:pointer;position:relative;
-      filter:drop-shadow(0 4px 9px rgba(0,0,0,.4));
+      filter:drop-shadow(0 8px 16px rgba(0,0,0,.45));
     }
     .art svg{display:block;width:100%;height:100%}
     .art img{display:block;width:100%;height:100%;
       object-fit:contain;border-radius:10px}
-    .art.photo{width:calc(60px * var(--fs))}
+    .art.photo{width:calc(var(--art) * 1.18)}
 
     /* Balayage du lidar, superposé à la photo pendant le travail. */
     .scan{
@@ -160,8 +160,8 @@ class EzvizVacuumCard extends HTMLElement{
     .art.busy .scan{opacity:.9;animation:evc-scan 1.8s linear infinite}
     @keyframes evc-scan{to{transform:rotate(360deg)}}
     .pulse{
-      position:absolute;inset:2px;border-radius:50%;pointer-events:none;
-      border:2px solid var(--vc);opacity:0;
+      position:absolute;inset:3px;border-radius:50%;pointer-events:none;
+      border:2.5px solid var(--vc);opacity:0;
     }
     .art.busy .pulse{animation:evc-ring 1.8s ease-out infinite}
     @keyframes evc-ring{
@@ -187,13 +187,13 @@ class EzvizVacuumCard extends HTMLElement{
     .txt{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;gap:2px;
       cursor:pointer}
     .nm{
-      font-size:calc(.78rem * var(--fs));font-weight:800;letter-spacing:.13em;
+      font-size:calc(.82rem * var(--fs));font-weight:800;letter-spacing:.13em;
       text-transform:uppercase;color:var(--secondary-text-color);opacity:.72;
       white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
     }
     .stt{
       display:flex;align-items:center;gap:7px;
-      font-size:calc(1.02rem * var(--fs));font-weight:700;color:var(--vc);
+      font-size:calc(1.24rem * var(--fs));font-weight:700;color:var(--vc);
       white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
       transition:color .4s ease;
     }
@@ -205,17 +205,17 @@ class EzvizVacuumCard extends HTMLElement{
     /* ---- batterie ---- */
     .bat{
       flex:none;display:flex;align-items:center;gap:5px;
-      font-size:calc(1.02rem * var(--fs));font-weight:700;
+      font-size:calc(1.22rem * var(--fs));font-weight:700;
       color:var(--bc);font-variant-numeric:tabular-nums;
     }
-    .bat ha-icon{--mdc-icon-size:calc(19px * var(--fs))}
+    .bat ha-icon{--mdc-icon-size:calc(23px * var(--fs))}
     .bat small{font-size:calc(.78rem * var(--fs));opacity:.75;margin-left:-2px}
 
     /* ---- commandes ---- */
     .cmd{flex:none;display:flex;gap:6px}
     .b{
-      width:calc(38px * var(--fs));height:calc(38px * var(--fs));
-      border:0;border-radius:11px;cursor:pointer;padding:0;
+      width:calc(44px * var(--fs));height:calc(44px * var(--fs));
+      border:0;border-radius:13px;cursor:pointer;padding:0;
       display:flex;align-items:center;justify-content:center;
       background:color-mix(in srgb, var(--primary-text-color) 8%, transparent);
       transition:background .18s, box-shadow .18s;
@@ -224,7 +224,7 @@ class EzvizVacuumCard extends HTMLElement{
     .b:hover:not(:disabled){
       background:color-mix(in srgb, var(--primary-text-color) 15%, transparent)}
     .b:disabled{opacity:.28;cursor:not-allowed}
-    .b ha-icon{--mdc-icon-size:calc(21px * var(--fs));
+    .b ha-icon{--mdc-icon-size:calc(24px * var(--fs));
       color:var(--secondary-text-color);transition:color .18s}
     .b.on{
       background:color-mix(in srgb, var(--bcol) 22%, transparent);
@@ -264,6 +264,8 @@ class EzvizVacuumCard extends HTMLElement{
     @container (max-width: 430px){
       .cons{grid-template-columns:1fr}
       .nm{display:none}
+      .art{width:calc(var(--art) * .7);height:calc(var(--art) * .7)}
+      .art.photo{width:calc(var(--art) * .82)}
     }
     @container (max-width: 330px){
       .bat{display:none}
@@ -304,6 +306,7 @@ class EzvizVacuumCard extends HTMLElement{
       fold:r.querySelector('.fold'), cons:r.querySelector('.cons')
     };
     this._el.card.style.setProperty('--fs', String(this._cfg.font_scale));
+    this._el.card.style.setProperty('--art', this._cfg.art_size + 'px');
     this._el.art.classList.toggle('photo', this._photo);
 
     this._el.go.addEventListener('click', () => this._call('start'));
