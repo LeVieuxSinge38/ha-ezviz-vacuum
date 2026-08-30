@@ -10,22 +10,13 @@ from homeassistant.components.vacuum import (
     VacuumActivity,
     VacuumEntityFeature,
 )
-from homeassistant.exceptions import ServiceValidationError
 
-try:  # `Segment` et CLEAN_AREA sont apparus avec Home Assistant 2026.3.
-    from homeassistant.components.vacuum import Segment
-
-    HAS_SEGMENTS = hasattr(VacuumEntityFeature, "CLEAN_AREA")
-except ImportError:  # pragma: no cover - versions antérieures
-    Segment = None
-    HAS_SEGMENTS = False
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from . import EzvizVacuumConfigEntry
 from .const import (
     CLEANING_STATES,
-    FAN_SPEEDS,
     PAUSED_STATES,
     RETURNING_STATES,
     STATE_DRYING_MOP,
@@ -36,19 +27,21 @@ _LOGGER = logging.getLogger(__name__)
 
 
 def _supported_features() -> VacuumEntityFeature:
-    """`STATE` a été retiré de certaines versions : on ne l'ajoute que s'il existe."""
+    """Uniquement ce qui atteint réellement le robot.
+
+    Ni `FAN_SPEED` ni `CLEAN_AREA` : ils reposeraient sur des écritures de
+    propriété, qui n'arrivent jamais jusqu'à l'appareil (voir le README).
+    `STATE` a été retiré de certaines versions, d'où le test.
+    """
     features = (
         VacuumEntityFeature.START
         | VacuumEntityFeature.PAUSE
         | VacuumEntityFeature.STOP
         | VacuumEntityFeature.RETURN_HOME
-        | VacuumEntityFeature.FAN_SPEED
         | VacuumEntityFeature.SEND_COMMAND
     )
     if hasattr(VacuumEntityFeature, "STATE"):
         features |= VacuumEntityFeature.STATE
-    if HAS_SEGMENTS:
-        features |= VacuumEntityFeature.CLEAN_AREA
     return features
 
 
@@ -68,7 +61,6 @@ class EzvizVacuum(EzvizVacuumBaseEntity, StateVacuumEntity):
 
     _attr_name = None
     _attr_supported_features = _supported_features()
-    _attr_fan_speed_list = list(FAN_SPEEDS.values())
 
     def __init__(self, coordinator, serial: str) -> None:
         super().__init__(coordinator, serial)
@@ -114,16 +106,6 @@ class EzvizVacuum(EzvizVacuumBaseEntity, StateVacuumEntity):
             self._last_activity = VacuumActivity.IDLE
 
         return self._last_activity
-
-    @property
-    def fan_speed(self) -> str | None:
-        std_clean = self._data.get("std_clean")
-        if not isinstance(std_clean, list) or not std_clean:
-            return None
-        first = std_clean[0]
-        if not isinstance(first, dict):
-            return None
-        return FAN_SPEEDS.get(first.get("fanMode"))
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
@@ -179,130 +161,6 @@ class EzvizVacuum(EzvizVacuumBaseEntity, StateVacuumEntity):
             self.coordinator.api.recharge, self._serial, "start"
         )
 
-    async def async_set_fan_speed(self, fan_speed: str, **kwargs: Any) -> None:
-        mode = next(
-            (key for key, label in FAN_SPEEDS.items() if label == fan_speed),
-            fan_speed,
-        )
-        if mode not in FAN_SPEEDS:
-            raise ValueError(f"Puissance d'aspiration inconnue : {fan_speed}")
-        await self.coordinator.async_send(
-            self.coordinator.api.set_fan_mode,
-            self._serial,
-            mode,
-            self._data.get("std_clean"),
-            refresh_slow=True,
-        )
-
-    # ------------------------------------------------------------------
-    # Nettoyage par pièce
-    # ------------------------------------------------------------------
-    def _segments(self) -> list[tuple[int, int, str, str]]:
-        """Pièces du robot : (mapID, roomID, nom, nom de la carte).
-
-        Les identifiants viennent de `RoomCustomCleanCfg`, qui est fiable.
-        `RoomBasicProperty` porte les vrais noms mais ne les renvoie pas
-        toujours : on retombe alors sur « Pièce N ». Ce n'est pas gênant,
-        puisque c'est l'utilisateur qui associe ensuite chaque pièce à une
-        zone Home Assistant.
-        """
-        map_names: dict[int, str] = {}
-        maps = self._data.get("maps")
-        if isinstance(maps, list):
-            for entry in maps:
-                if isinstance(entry, dict) and entry.get("mapID") is not None:
-                    map_names[entry["mapID"]] = entry.get("mapName") or ""
-
-        room_names: dict[tuple[int, int], str] = {}
-        rooms = self._data.get("rooms")
-        if isinstance(rooms, list):
-            for entry in rooms:
-                if not isinstance(entry, dict):
-                    continue
-                map_id = entry.get("mapID")
-                for room in entry.get("room", []):
-                    if isinstance(room, dict) and room.get("roomName"):
-                        room_names[(map_id, room.get("roomID"))] = room["roomName"]
-
-        segments: list[tuple[int, int, str, str]] = []
-        room_cfg = self._data.get("room_cfg")
-        if not isinstance(room_cfg, list):
-            return segments
-
-        for entry in room_cfg:
-            if not isinstance(entry, dict):
-                continue
-            map_id = entry.get("mapID")
-            for room in entry.get("room", []):
-                if not isinstance(room, dict):
-                    continue
-                if room.get("regionType") != "room":
-                    continue
-                room_id = room.get("roomID")
-                if map_id is None or room_id is None:
-                    continue
-                name = room_names.get((map_id, room_id)) or f"Pièce {room_id}"
-                segments.append((map_id, room_id, name, map_names.get(map_id, "")))
-        return segments
-
-    async def async_get_segments(self) -> list:
-        """Expose les pièces à Home Assistant, qui gère l'association aux zones."""
-        if not HAS_SEGMENTS:
-            return []
-        return [
-            Segment(id=f"{map_id}-{room_id}", name=name, group=map_name or None)
-            for map_id, room_id, name, map_name in self._segments()
-        ]
-
-    async def async_clean_segments(self, segment_ids: list[str], **kwargs: Any) -> None:
-        """Nettoie les pièces demandées, désignées par leur identifiant."""
-        wanted: set[tuple[int, int]] = set()
-        maps_touched: set[int] = set()
-        for map_id, room_id, _name, _map_name in self._segments():
-            if f"{map_id}-{room_id}" in segment_ids:
-                wanted.add((map_id, room_id))
-                maps_touched.add(map_id)
-
-        if not wanted:
-            raise ServiceValidationError(
-                "Aucune pièce connue ne correspond à cette demande."
-            )
-
-        # Le robot ne travaille que sur la carte active : mélanger deux étages
-        # produirait un nettoyage silencieusement incomplet.
-        if len(maps_touched) > 1:
-            raise ServiceValidationError(
-                "Les pièces demandées appartiennent à plusieurs cartes. "
-                "Le robot ne peut nettoyer qu'une carte à la fois."
-            )
-
-        map_id = maps_touched.pop()
-        active = self._active_map_id()
-        if active is not None and map_id != active:
-            raise ServiceValidationError(
-                f"Ces pièces sont sur une carte inactive. Bascule le robot sur "
-                f"cette carte dans l'application EZVIZ, puis relance."
-            )
-
-        await self.coordinator.async_send(
-            self.coordinator.api.clean_rooms,
-            self._serial,
-            wanted,
-            self._data.get("room_cfg"),
-            self._data.get("std_clean"),
-            map_id,
-            refresh_slow=True,
-        )
-
-    def _active_map_id(self) -> int | None:
-        maps = self._data.get("maps")
-        if not isinstance(maps, list):
-            return None
-        for entry in maps:
-            if isinstance(entry, dict) and entry.get("inUse"):
-                return entry.get("mapID")
-        return None
-
     async def async_send_command(
         self,
         command: str,
@@ -312,10 +170,7 @@ class EzvizVacuum(EzvizVacuumBaseEntity, StateVacuumEntity):
         """Passe une commande brute, pour ce que l'entité n'expose pas.
 
         `clean` accepte start, pause, resume, stop ;
-        `recharge` accepte start et stop ;
-        `clean_rooms` prend une liste d'identifiants de pièces, ce qui permet
-        de lancer une pièce sans avoir à l'associer d'abord à une zone Home
-        Assistant — utile pour découvrir quelle pièce porte quel numéro.
+        `recharge` accepte start et stop.
         """
         if command == "clean":
             action = (params or {}).get("action", "start")
@@ -327,10 +182,5 @@ class EzvizVacuum(EzvizVacuumBaseEntity, StateVacuumEntity):
             await self.coordinator.async_send(
                 self.coordinator.api.recharge, self._serial, action
             )
-        elif command == "clean_rooms":
-            segments = (params or {}).get("segments") or []
-            if isinstance(segments, str):
-                segments = [segments]
-            await self.async_clean_segments([str(s) for s in segments])
         else:
             raise ValueError(f"Commande inconnue : {command}")

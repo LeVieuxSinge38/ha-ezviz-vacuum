@@ -13,96 +13,47 @@ Une entité `vacuum` — démarrage, pause, reprise, arrêt, retour à la base,
 puissance d'aspiration — plus des capteurs : batterie, panne en cours, et
 l'usure des cinq consommables (serpillère, filtre HEPA, brosses, capteurs).
 
-**Nettoyage par pièce** via le service natif `vacuum.clean_area` : les pièces
-du robot sont exposées comme segments, et Home Assistant fournit l'écran
-d'association pièce ↔ zone dans les paramètres de l'entité.
+La puissance d'aspiration est exposée en **lecture seule** (capteur
+« Aspiration »), et les cartes et pièces du robot en attributs de l'entité.
 
-```yaml
-actions:
-  - action: vacuum.clean_area
-    target:
-      entity_id: vacuum.re5_plus
-    data:
-      area_id:
-        - cuisine
-```
+## Ce que cette intégration ne peut pas faire
 
-Les cartes et les pièces du robot sont aussi exposées en attributs de
-l'entité.
+**Régler la puissance d'aspiration, et nettoyer une pièce précise.** Ces deux
+fonctions ont été implémentées, testées, puis **retirées** : elles ne
+fonctionnent pas, et ce n'est pas réparable côté intégration.
 
-### Lancer une pièce sans l'associer
+Le cloud EZVIZ expose deux routes. Elles ne sont pas équivalentes :
 
-`vacuum.clean_area` exige une association préalable. Pour lancer une pièce
-directement — notamment pour découvrir quel numéro correspond à quelle
-pièce — passer par `send_command` :
+| Route | Effet | Réponse |
+|---|---|---|
+| `/v3/iot-feature/action/…` | atteint l'appareil | `200` **avec** `deviceMeta` |
+| `/v3/iot-feature/feature/…` | met à jour le cache du cloud | `200` **sans** `deviceMeta` |
 
-```yaml
-actions:
-  - action: vacuum.send_command
-    target:
-      entity_id: vacuum.re5_plus
-    data:
-      command: clean_rooms
-      params:
-        segments: ["22-3"]
-```
+Démarrer, mettre en pause et renvoyer à la base sont des **actions** : le
+robot les reçoit et les exécute.
 
-L'identifiant d'une pièce s'écrit `{mapID}-{roomID}`.
+La puissance d'aspiration et la sélection des pièces sont des **propriétés**.
+Y écrire renvoie un `200` franc, et une relecture renvoie fidèlement la valeur
+écrite — mais c'est le cache du cloud qu'on relit. Vérifié sur l'appareil :
+après un changement depuis Home Assistant, le robot n'émet pas son bip de
+confirmation et l'application EZVIZ affiche toujours l'ancien réglage.
 
-### Associer les pièces aux zones
+Le piège est qu'une intégration naïve paraît fonctionner : l'entité affiche
+la nouvelle valeur, l'historique la confirme, et seul l'appareil sait que rien
+n'a changé. **Le bloc `deviceMeta` est le seul critère fiable.**
 
-**Paramètres → Appareils et services → Entités → RE5 Plus → roue dentée**,
-puis la section de correspondance des zones. Chaque pièce du robot s'y
-rattache à une zone Home Assistant. Une fois fait, `vacuum.clean_area`
-fonctionne comme sur n'importe quel autre aspirateur.
-
-## Installation
-
-### Par HACS
-
-1. HACS → menu ⋮ → **Dépôts personnalisés**
-2. URL : `https://github.com/mickaelveber38-netizen/ha-ezviz-vacuum`,
-   catégorie **Integration**
-3. Chercher **EZVIZ Vacuum**, télécharger
-4. Redémarrer Home Assistant
-5. **Paramètres → Appareils et services → Ajouter une intégration** →
-   *EZVIZ Vacuum*
-
-### À la main
-
-Copier `custom_components/ezviz_vacuum/` dans le dossier `config/` de Home
-Assistant, redémarrer, puis ajouter l'intégration.
-
-### Configuration
-
-Les identifiants du compte EZVIZ, ceux de l'application mobile. La double
-authentification n'est pas encore prise en charge.
-
-## Rythme de relevé
-
-Deux cadences, pour ne pas marteler le cloud EZVIZ :
-
-- **toutes les 30 s** : tâche en cours et batterie
-- **toutes les 5 min** : consommables, cartes, pièces, puissance d'aspiration
-
-Une écriture qui touche la seconde catégorie — puissance d'aspiration,
-nettoyage par pièce — force la relecture immédiatement. Sans cela l'interface
-afficherait l'ancienne valeur pendant plusieurs minutes et le réglage
-paraîtrait n'avoir aucun effet.
+Ces réglages restent donc à faire depuis l'application EZVIZ. Si quelqu'un
+trouve les actions correspondantes — elles existent forcément, l'application
+les utilise — la fonction se rebranche en quelques lignes.
 
 ## Limites connues
 
 - **Cloud uniquement.** Aucune commande locale : sans Internet, rien ne
   répond. Le robot n'expose pas d'API sur le réseau local.
-- **Le nettoyage par pièce change un réglage du robot.** Il n'existe pas de
-  commande « nettoie telle pièce » : la sélection est un réglage persistant.
-  Lancer une zone bascule la carte en mode `custom` et y laisse l'ordre de
-  passage. Un démarrage manuel ultérieur depuis l'application ne nettoiera
-  donc que les dernières pièces choisies, jusqu'à ce que le mode soit remis
-  sur « toute la surface ».
-- **Une seule carte à la fois.** Le robot ne travaille que sur sa carte
-  active ; demander des pièces d'un autre étage échoue avec un message
-  explicite plutôt que de nettoyer à moitié.
+- **Pas de nettoyage par pièce ni de réglage d'aspiration** — voir la section
+  précédente.
+- **La carte active change toute seule.** Le robot bascule entre ses cartes au
+  fil de ses trajets ; un code qui suppose une carte fixe se trompera.
 - **Les pièces s'appellent « Pièce N ».** `RoomBasicProperty`, seule
   propriété censée porter les noms, renvoie `true` au lieu de son tableau sur
   ce firmware. Sans conséquence pratique : c'est l'association aux zones Home
@@ -154,8 +105,10 @@ détail qui a coûté le plus de temps.
       return_to_base / batterie / puissance d'aspiration)
 - [x] **Étape 4a — Schéma des cartes** : extrait, le nettoyage par pièce est
       pilotable (voir *Nettoyage par pièce*)
-- [x] **Étape 4b — Nettoyage par pièce** : implémenté via `vacuum.clean_area`
-      (segments + association aux zones gérée par Home Assistant)
+- [x] **Étape 4b — Nettoyage par pièce** : implémenté, testé, **retiré** — les
+      écritures de propriété n'atteignent pas l'appareil
+- [ ] **Étape 5 — Actions manquantes** : trouver les actions `Plt2Dev` pour la
+      puissance d'aspiration et le nettoyage par pièce
 
 ## Ce qu'on sait (RE5 Plus, firmware V0.01.92)
 
