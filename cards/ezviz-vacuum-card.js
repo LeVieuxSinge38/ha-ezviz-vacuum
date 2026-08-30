@@ -92,6 +92,9 @@ class EzvizVacuumCard extends HTMLElement{
     /* Adresses résolues des `media-source://`, avec leur péremption. */
     this._srcCache = {};
     this._curId = null;
+    /* État attendu après un appui, le temps que le robot publie le sien. */
+    this._pending = null;
+    this._pendUntil = 0;
   }
 
   setConfig(cfg){
@@ -193,11 +196,11 @@ class EzvizVacuumCard extends HTMLElement{
     }
     .stt{
       display:flex;align-items:center;gap:7px;
-      font-size:calc(1.24rem * var(--fs));font-weight:700;color:var(--vc);
+      font-size:calc(1.38rem * var(--fs));font-weight:700;color:var(--vc);
       white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
       transition:color .4s ease;
     }
-    .dot{width:7px;height:7px;border-radius:50%;background:var(--vc);flex:none}
+    .dot{width:8px;height:8px;border-radius:50%;background:var(--vc);flex:none}
     .busy .dot{animation:evc-dot 1.3s ease-in-out infinite}
     @keyframes evc-dot{50%{opacity:.25;transform:scale(.7)}}
     .stt.err{color:#f87171}
@@ -205,10 +208,10 @@ class EzvizVacuumCard extends HTMLElement{
     /* ---- batterie ---- */
     .bat{
       flex:none;display:flex;align-items:center;gap:5px;
-      font-size:calc(1.22rem * var(--fs));font-weight:700;
+      font-size:calc(1.38rem * var(--fs));font-weight:700;
       color:var(--bc);font-variant-numeric:tabular-nums;
     }
-    .bat ha-icon{--mdc-icon-size:calc(23px * var(--fs))}
+    .bat ha-icon{--mdc-icon-size:calc(26px * var(--fs))}
     .bat small{font-size:calc(.78rem * var(--fs));opacity:.75;margin-left:-2px}
 
     /* ---- commandes ---- */
@@ -265,7 +268,10 @@ class EzvizVacuumCard extends HTMLElement{
        s'étirent. Le texte récupère toute la largeur au lieu d'être tronqué,
        et les boutons deviennent des cibles bien plus confortables. */
     @container (max-width: 580px){
-      .row{flex-wrap:wrap}
+      .row{flex-wrap:wrap;justify-content:center}
+      /* Le texte cesse d'absorber la place libre : sans cela il repousse la
+         batterie à l'extrémité et creuse un vide au milieu. */
+      .txt{flex:0 1 auto}
       .cmd{width:100%;gap:8px;margin-top:12px}
       .b{flex:1 1 0;width:auto}
       .chev{flex:0 0 calc(46px * var(--fs))}
@@ -338,6 +344,16 @@ class EzvizVacuumCard extends HTMLElement{
 
   _call(service){
     if(!this._hass) return;
+    /* Le robot met une vingtaine de secondes à publier son nouvel état. On
+       affiche donc l'état attendu sans attendre, quitte à le corriger si
+       l'appareil dit autre chose. */
+    const expect = {start:'cleaning', pause:'paused',
+                    return_to_base:'returning'}[service];
+    if(expect){
+      this._pending = expect;
+      this._pendUntil = Date.now() + 30000;
+      this._paint();
+    }
     this._hass.callService('vacuum', service, {}, {entity_id:this._cfg.entity});
   }
 
@@ -374,12 +390,20 @@ class EzvizVacuumCard extends HTMLElement{
     }
   }
 
-  set hass(h){ this._hass = h; if(this._built) this._paint(); }
+  set hass(h){
+    this._hass = h;
+    if(this._pending){
+      const st = h.states[this._cfg.entity];
+      if((st && st.state === this._pending) || Date.now() > this._pendUntil)
+        this._pending = null;
+    }
+    if(this._built) this._paint();
+  }
 
   _paint(){
     const c = this._cfg, e = this._el;
     const st = this._hass.states[c.entity];
-    const state = st ? st.state : 'unavailable';
+    const state = this._pending || (st ? st.state : 'unavailable');
     const info = EVC_STATES[state] ||
       {t:state, col:'rgba(150,150,150,.85)', busy:false};
 
