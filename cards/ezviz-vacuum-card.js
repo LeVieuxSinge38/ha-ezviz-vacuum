@@ -89,6 +89,9 @@ class EzvizVacuumCard extends HTMLElement{
     this.attachShadow({mode:'open'});
     this._built = false;
     this._open = false;
+    /* Adresses résolues des `media-source://`, avec leur péremption. */
+    this._srcCache = {};
+    this._curId = null;
   }
 
   setConfig(cfg){
@@ -329,6 +332,39 @@ class EzvizVacuumCard extends HTMLElement{
     this._hass.callService('vacuum', service, {}, {entity_id:this._cfg.entity});
   }
 
+  /* Une image de la médiathèque n'a pas d'adresse fixe : Home Assistant la
+     sert sous une signature qui expire. On la lui redemande donc, et on la
+     garde quelques heures plutôt que d'interroger à chaque rafraîchissement. */
+  async _applyPhoto(id){
+    if(!id || !this._el.img) return;
+    this._curId = id;
+
+    if(!id.startsWith('media-source://')){
+      if(this._el.img.getAttribute('src') !== id)
+        this._el.img.setAttribute('src', id);
+      return;
+    }
+
+    const hit = this._srcCache[id];
+    if(hit && Date.now() < hit.until){
+      if(this._el.img.getAttribute('src') !== hit.url)
+        this._el.img.setAttribute('src', hit.url);
+      return;
+    }
+
+    try{
+      const r = await this._hass.callWS({
+        type:'media_source/resolve_media', media_content_id:id, expires:86400
+      });
+      this._srcCache[id] = {url:r.url, until:Date.now() + 6 * 3600 * 1000};
+      /* L'état a pu changer pendant l'attente : on n'écrase pas l'image
+         courante si ce n'est plus celle qu'on veut afficher. */
+      if(this._curId === id) this._el.img.setAttribute('src', r.url);
+    }catch(err){
+      console.error('ezviz-vacuum-card : image introuvable', id, err);
+    }
+  }
+
   set hass(h){ this._hass = h; if(this._built) this._paint(); }
 
   _paint(){
@@ -342,10 +378,10 @@ class EzvizVacuumCard extends HTMLElement{
     e.nm.textContent = c.name || (st ? st.attributes.friendly_name : 'Aspirateur');
     /* La photo sur base quand il y est, l'autre sinon. */
     if(this._photo && e.img){
-      const src = (state === 'docked' && c.image_docked)
+      const want = (state === 'docked' && c.image_docked)
         ? c.image_docked
         : (c.image || c.image_docked);
-      if(e.img.getAttribute('src') !== src) e.img.setAttribute('src', src);
+      if(want !== this._curId) this._applyPhoto(want);
     }
 
     e.card.classList.toggle('busy', info.busy);
