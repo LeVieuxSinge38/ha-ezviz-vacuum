@@ -97,7 +97,8 @@ class EzvizVacuumCard extends HTMLElement{
       throw new Error('Cette carte attend une entité du domaine vacuum');
 
     this._cfg = Object.assign({
-      name:null, battery:null, fault:null, image:null,
+      name:null, battery:null, fault:null,
+      image:null, image_docked:null,
       consumables:[], consumable_mode:'wear', show_hours:true,
       font_scale:1
     }, cfg);
@@ -106,8 +107,12 @@ class EzvizVacuumCard extends HTMLElement{
                             : {entity:c.entity, name:c.name || null});
     this._open = !!cfg.expanded;
 
-    const art = this._cfg.image
-      ? '<img src="' + this._cfg.image + '" alt="">'
+    /* Une photo par état si l'utilisateur en fournit deux : le robot sur sa
+       base quand il y est, vu de dessus quand il travaille. À défaut, le
+       dessin, qui se recolore avec l'état. */
+    this._photo = !!(this._cfg.image || this._cfg.image_docked);
+    const art = this._photo
+      ? '<img alt="">'
       : EVC_ART;
 
     this.shadowRoot.innerHTML = `
@@ -134,8 +139,32 @@ class EzvizVacuumCard extends HTMLElement{
       cursor:pointer;position:relative;
       filter:drop-shadow(0 4px 9px rgba(0,0,0,.4));
     }
-    .art svg,.art img{display:block;width:100%;height:100%;
-      object-fit:cover;border-radius:50%}
+    .art svg{display:block;width:100%;height:100%}
+    .art img{display:block;width:100%;height:100%;
+      object-fit:contain;border-radius:10px}
+    .art.photo{width:calc(60px * var(--fs))}
+
+    /* Balayage du lidar, superposé à la photo pendant le travail. */
+    .scan{
+      position:absolute;inset:0;border-radius:50%;pointer-events:none;
+      opacity:0;transition:opacity .5s;
+      background:conic-gradient(from 0deg,
+        color-mix(in srgb, var(--vc) 55%, transparent) 0deg,
+        transparent 55deg, transparent 360deg);
+      -webkit-mask:radial-gradient(circle, #000 62%, transparent 63%);
+      mask:radial-gradient(circle, #000 62%, transparent 63%);
+    }
+    .art.busy .scan{opacity:.9;animation:evc-scan 1.8s linear infinite}
+    @keyframes evc-scan{to{transform:rotate(360deg)}}
+    .pulse{
+      position:absolute;inset:2px;border-radius:50%;pointer-events:none;
+      border:2px solid var(--vc);opacity:0;
+    }
+    .art.busy .pulse{animation:evc-ring 1.8s ease-out infinite}
+    @keyframes evc-ring{
+      0%{opacity:.55;transform:scale(.82)}
+      100%{opacity:0;transform:scale(1.12)}
+    }
     .brush{transform-origin:70px 66px}
     .busy .brush{animation:evc-spin .9s linear infinite}
     @keyframes evc-spin{to{transform:translate(70px,66px) rotate(360deg)}}
@@ -239,7 +268,8 @@ class EzvizVacuumCard extends HTMLElement{
     </style>
     <ha-card>
       <div class="row">
-        <div class="art">` + art + `</div>
+        <div class="art">` + art +
+              `<div class="scan"></div><div class="pulse"></div></div>
         <div class="txt">
           <div class="nm"></div>
           <div class="stt"><span class="dot"></span><span class="lbl"></span></div>
@@ -262,6 +292,7 @@ class EzvizVacuumCard extends HTMLElement{
     const r = this.shadowRoot;
     this._el = {
       card:r.querySelector('ha-card'), art:r.querySelector('.art'),
+      img:r.querySelector('.art img'),
       nm:r.querySelector('.nm'), stt:r.querySelector('.stt'),
       lbl:r.querySelector('.lbl'), bat:r.querySelector('.bat'),
       batIcon:r.querySelector('.bat ha-icon'), pct:r.querySelector('.pct'),
@@ -270,6 +301,7 @@ class EzvizVacuumCard extends HTMLElement{
       fold:r.querySelector('.fold'), cons:r.querySelector('.cons')
     };
     this._el.card.style.setProperty('--fs', String(this._cfg.font_scale));
+    this._el.art.classList.toggle('photo', this._photo);
 
     this._el.go.addEventListener('click', () => this._call('start'));
     this._el.pause.addEventListener('click', () => this._call('pause'));
@@ -308,6 +340,14 @@ class EzvizVacuumCard extends HTMLElement{
 
     e.card.style.setProperty('--vc', info.col);
     e.nm.textContent = c.name || (st ? st.attributes.friendly_name : 'Aspirateur');
+    /* La photo sur base quand il y est, l'autre sinon. */
+    if(this._photo && e.img){
+      const src = (state === 'docked' && c.image_docked)
+        ? c.image_docked
+        : (c.image || c.image_docked);
+      if(e.img.getAttribute('src') !== src) e.img.setAttribute('src', src);
+    }
+
     e.card.classList.toggle('busy', info.busy);
     e.art.classList.toggle('busy', info.busy);
     e.stt.classList.toggle('busy', info.busy);
