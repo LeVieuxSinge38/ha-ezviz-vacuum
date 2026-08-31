@@ -222,6 +222,21 @@ class EzvizVacuumCard extends HTMLElement{
     .busy .halo{animation:evc-halo 2s ease-in-out infinite}
     @keyframes evc-halo{50%{opacity:.85}}
 
+    /* ---- zone centrale ----
+       Sur une carte large il reste un grand vide entre les commandes et
+       l'état. Plutôt que de l'étaler, on y remonte l'entretien : la même
+       information que sous le chevron, mais lisible sans un geste. Elle
+       n'apparaît qu'à partir d'une largeur où elle tient à l'aise. */
+    .mid{display:none;flex:1 1 0;min-width:0}
+    .mid .cons{
+      margin:0;padding:0;border-top:0;
+      grid-template-columns:repeat(auto-fit, minmax(128px, 1fr));
+      gap:6px 20px;
+    }
+    .mid .c .k{font-size:calc(.72rem * var(--fs))}
+    .mid .c .v{font-size:calc(.76rem * var(--fs))}
+    .mid .c .l{margin-bottom:3px}
+
     /* ---- colonne de droite : nom, état, batterie ---- */
     .info{
       flex:1 1 0;min-width:0;display:flex;flex-direction:column;
@@ -322,6 +337,15 @@ class EzvizVacuumCard extends HTMLElement{
     .bar i{display:block;height:100%;border-radius:999px;
       transition:width .6s ease}
 
+    /* Carte large : l'entretien occupe le centre, le chevron n'a plus
+       rien à déplier et s'efface. */
+    @container (min-width: 660px){
+      .mid{display:block}
+      .info{flex:0 0 auto}
+      .chev{display:none !important}
+      .fold{display:none}
+    }
+
     /* Carte étroite : la photo cède la place en premier, c'est elle qui
        coûte le plus de largeur. */
     @container (max-width: 420px){
@@ -347,6 +371,7 @@ class EzvizVacuumCard extends HTMLElement{
           <button class="b home" title="Retour à la base">
             <ha-icon icon="mdi:home-import-outline"></ha-icon></button>
         </div>
+        <div class="mid"><div class="cons inline"></div></div>
         <div class="info">
           <div class="txt">
             <div class="nm"></div>
@@ -369,7 +394,8 @@ class EzvizVacuumCard extends HTMLElement{
       batIcon:r.querySelector('.bat ha-icon'), pct:r.querySelector('.pct'),
       go:r.querySelector('.go'), pause:r.querySelector('.pause'),
       home:r.querySelector('.home'), chev:r.querySelector('.chev'),
-      fold:r.querySelector('.fold'), cons:r.querySelector('.cons')
+      fold:r.querySelector('.fold'), cons:r.querySelector('.fold .cons'),
+      consMid:r.querySelector('.cons.inline')
     };
     this._el.card.style.setProperty('--fs', String(this._cfg.font_scale));
     this._el.card.style.setProperty('--art', this._cfg.art_size + 'px');
@@ -546,7 +572,10 @@ class EzvizVacuumCard extends HTMLElement{
         '<div class="bar"><i style="width:' + pctBar + '%;background:' +
         col + '"></i></div></div>';
     }
+    /* Le même balisage sert aux deux emplacements ; la largeur de la carte
+       décide lequel est visible. */
     e.cons.innerHTML = rows;
+    e.consMid.innerHTML = rows;
     e.chev.style.display = rows ? '' : 'none';
 
     /* ---- commandes ---- */
