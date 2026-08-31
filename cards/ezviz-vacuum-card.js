@@ -655,20 +655,23 @@ const EVC_SCHEMA = [
   {name:'consumables',
    selector:{entity:{domain:'sensor', multiple:true}}},
 
-  {name:'photos', type:'expandable', iconPath:null, schema:[
+  /* `name:''` est obligatoire : avec un nom, ha-form range les champs de la
+     section dans un sous-objet portant ce nom, et la carte, qui les lit à la
+     racine, ne voit plus rien changer. Le titre passe par `title`. */
+  {name:'', type:'expandable', title:'Photos', schema:[
     {name:'image_docked', selector:{text:{}}},
     {name:'image', selector:{text:{}}},
     {name:'image_round', selector:{boolean:{}}}
   ]},
 
-  {name:'mise_en_page', type:'expandable', schema:[
+  {name:'', type:'expandable', title:'Mise en page', schema:[
     {name:'art_size',
      selector:{number:{min:64, max:180, step:2, mode:'slider'}}},
     {name:'font_scale',
      selector:{number:{min:.7, max:1.4, step:.02, mode:'slider'}}}
   ]},
 
-  {name:'entretien', type:'expandable', schema:[
+  {name:'', type:'expandable', title:'Entretien', schema:[
     {name:'consumable_mode', selector:{select:{mode:'dropdown', options:[
       {value:'wear', label:'Usure (100 % = à remplacer)'},
       {value:'remaining', label:'Restant (0 % = à remplacer)'}
@@ -679,7 +682,9 @@ const EVC_SCHEMA = [
     {name:'expanded', selector:{boolean:{}}}
   ]},
 
-  {name:'palette', type:'expandable', schema:[
+  /* La palette, elle, est bien un sous-objet dans la config : ici
+     l'imbrication est voulue. */
+  {name:'palette', type:'expandable', title:'Couleurs', schema:[
     {name:'blue', selector:{color_rgb:{}}},
     {name:'cyan', selector:{color_rgb:{}}},
     {name:'green', selector:{color_rgb:{}}},
@@ -692,15 +697,13 @@ const EVC_LABELS = {
   entity:'Aspirateur', name:'Titre affiché',
   battery:'Capteur de batterie', fault:'Capteur de panne',
   consumables:'Consommables suivis',
-  photos:'Photos', image_docked:'Photo sur la base',
+  image_docked:'Photo sur la base',
   image:'Photo en fonctionnement', image_round:'Recadrer la photo en rond',
-  mise_en_page:'Mise en page',
   art_size:'Taille de la photo (px)', font_scale:'Taille du texte',
-  entretien:'Entretien', consumable_mode:'Afficher',
+  consumable_mode:'Afficher',
   alert_wear:'Seuil du badge d\'alerte (%)',
   show_hours:'Afficher les heures restantes',
   expanded:'Entretien déplié par défaut',
-  palette:'Couleurs',
   blue:'Bleu', cyan:'Cyan', green:'Vert', yellow:'Jaune', magenta:'Magenta'
 };
 
@@ -745,6 +748,17 @@ class EzvizVacuumCardEditor extends HTMLElement{
      {entity, name}, le sélecteur n'accepte que des identifiants ; les
      couleurs sont du CSS, la pastille veut du [r, g, b]. */
   _toForm(cfg){
+    /* Une version précédente rangeait ces champs dans des sous-objets ; on
+       les remonte à la racine pour que les réglages déjà saisis reparaissent
+       au lieu d'être perdus. */
+    cfg = Object.assign({}, cfg);
+    for(const legacy of ['photos', 'mise_en_page', 'entretien']){
+      if(cfg[legacy] && typeof cfg[legacy] === 'object'){
+        for(const k of Object.keys(cfg[legacy]))
+          if(cfg[k] === undefined) cfg[k] = cfg[legacy][k];
+        delete cfg[legacy];
+      }
+    }
     const pal = cfg.palette || {};
     const out = Object.assign({}, cfg, {
       consumables:(cfg.consumables || []).map(
@@ -769,6 +783,8 @@ class EzvizVacuumCardEditor extends HTMLElement{
     }
     if(Object.keys(pal).length) out.palette = pal;
     else delete out.palette;
+    for(const legacy of ['photos', 'mise_en_page', 'entretien'])
+      delete out[legacy];
     for(const k of Object.keys(out))
       if(out[k] === undefined || out[k] === '') delete out[k];
     return out;
