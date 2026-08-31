@@ -146,7 +146,7 @@ class EzvizVacuumCard extends HTMLElement{
     }
     ha-card{
       position:relative;overflow:hidden;container-type:inline-size;
-      padding:16px 18px;
+      padding:11px 16px;
       background:
         radial-gradient(130% 110% at 50% -25%, rgba(255,255,255,.08), transparent 62%),
         var(--ha-card-background, var(--card-background-color, #1c1c1c));
@@ -217,8 +217,11 @@ class EzvizVacuumCard extends HTMLElement{
     @keyframes evc-halo{50%{opacity:.85}}
 
     /* ---- nom et état ---- */
+    /* Le bloc texte occupe toute la place entre le robot et la batterie et
+       centre son contenu : on obtient trois zones nettes — robot à gauche,
+       état au milieu, batterie à droite — sans vide au milieu. */
     .txt{flex:1 1 0;min-width:110px;display:flex;flex-direction:column;gap:2px;
-      cursor:pointer}
+      align-items:center;text-align:center;cursor:pointer}
     .nm{
       font-size:calc(.82rem * var(--fs));font-weight:800;letter-spacing:.13em;
       text-transform:uppercase;opacity:.9;
@@ -250,23 +253,27 @@ class EzvizVacuumCard extends HTMLElement{
     /* ---- commandes ---- */
     .cmd{flex:none;display:flex;gap:6px}
     .b{
-      width:calc(40px * var(--fs));height:calc(40px * var(--fs));
+      width:calc(38px * var(--fs));height:calc(36px * var(--fs));
       border:0;border-radius:12px;cursor:pointer;padding:0;
       display:flex;align-items:center;justify-content:center;
-      background:color-mix(in srgb, var(--primary-text-color) 8%, transparent);
+      background:color-mix(in srgb,
+        var(--bcol, var(--primary-text-color)) 13%, transparent);
       transition:background .18s, box-shadow .18s;
       -webkit-tap-highlight-color:transparent;
     }
     .b:hover:not(:disabled){
-      background:color-mix(in srgb, var(--primary-text-color) 15%, transparent)}
+      background:color-mix(in srgb,
+        var(--bcol, var(--primary-text-color)) 26%, transparent)}
     .b:disabled{opacity:.28;cursor:not-allowed}
+    /* L'icône porte sa couleur en permanence : le vert dit « démarrer »
+       même quand le robot est à la base. L'état actif se marque par le fond
+       plus dense et le liseré, plus par la couleur. */
     .b ha-icon{--mdc-icon-size:calc(22px * var(--fs));
-      color:var(--secondary-text-color);transition:color .18s}
+      color:var(--bcol, var(--secondary-text-color));transition:color .18s}
     .b.on{
-      background:color-mix(in srgb, var(--bcol) 22%, transparent);
-      box-shadow:inset 0 0 0 1px color-mix(in srgb, var(--bcol) 50%, transparent);
+      background:color-mix(in srgb, var(--bcol) 30%, transparent);
+      box-shadow:inset 0 0 0 1.5px color-mix(in srgb, var(--bcol) 70%, transparent);
     }
-    .b.on ha-icon{color:var(--bcol)}
     .chev{background:transparent;width:calc(28px * var(--fs))}
     .chev ha-icon{transition:transform .3s ease}
     .chev.open ha-icon{transform:rotate(180deg)}
@@ -280,7 +287,7 @@ class EzvizVacuumCard extends HTMLElement{
     .foldin{overflow:hidden;min-height:0}
     .cons{
       display:grid;grid-template-columns:1fr 1fr;gap:9px 16px;
-      margin-top:12px;padding-top:11px;
+      margin-top:10px;padding-top:9px;
       border-top:1px solid var(--divider-color, rgba(127,127,127,.2));
     }
     .c .l{display:flex;align-items:baseline;gap:6px;margin-bottom:4px}
@@ -301,11 +308,8 @@ class EzvizVacuumCard extends HTMLElement{
        s'étirent. Le texte récupère toute la largeur au lieu d'être tronqué,
        et les boutons deviennent des cibles bien plus confortables. */
     @container (max-width: 580px){
-      .row{flex-wrap:wrap;justify-content:center}
-      /* Le texte cesse d'absorber la place libre : sans cela il repousse la
-         batterie à l'extrémité et creuse un vide au milieu. */
-      .txt{flex:0 1 auto}
-      .cmd{width:100%;gap:8px;margin-top:12px}
+      .row{flex-wrap:wrap}
+      .cmd{width:100%;gap:8px;margin-top:9px}
       .b{flex:1 1 0;width:auto}
       .chev{flex:0 0 calc(46px * var(--fs))}
     }
