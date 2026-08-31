@@ -4,15 +4,19 @@
    fois par mois, il n'a rien à faire en permanence sur un tableau de bord.
    Toutes les tailles dérivent de --fs, réglable par font_scale. */
 
-/* Couleurs relevées sur le logo EZVIZ. Elles ne servent qu'à porter une
-   information — l'état du robot, la fonction d'un bouton, un niveau —
-   jamais à décorer : le fond, le titre et les bordures restent neutres.
-   Réglables par l'option `palette`. */
+/* Les cinq pétales du logo EZVIZ. Ils tiennent le liseré de la carte et
+   l'état du robot ; réglables par l'option `palette`. */
 const EVC_BLUE    = '#1d9cd8';  // pétale bleu
 const EVC_CYAN    = '#4cc3ec';  // bord clair du pétale bleu
 const EVC_GREEN   = '#8cc63f';  // pétale vert
 const EVC_YELLOW  = '#f5b21f';  // pétale jaune
 const EVC_MAGENTA = '#ec008c';  // pétale magenta
+
+/* Tout ce qui est un niveau — batterie, usure — suit l'échelle que tout le
+   monde lit sans réfléchir : vert, orange, rouge. */
+const EVC_OK   = '#5cb85c';
+const EVC_WARN = '#f0951f';
+const EVC_LOW  = '#e04b4b';
 
 const EVC_STATES = {
   cleaning:   {t:'En nettoyage',     col:EVC_GREEN,   busy:true},
@@ -20,7 +24,7 @@ const EVC_STATES = {
   paused:     {t:'En pause',         col:EVC_YELLOW,  busy:false},
   docked:     {t:'À la base',        col:EVC_CYAN,    busy:false},
   idle:       {t:"À l'arrêt",        col:'rgba(150,150,150,.85)', busy:false},
-  error:      {t:'Erreur',           col:EVC_MAGENTA, busy:false},
+  error:      {t:'Erreur',           col:EVC_LOW,     busy:false},
   unavailable:{t:'Indisponible',     col:'rgba(150,150,150,.6)', busy:false}
 };
 
@@ -48,13 +52,13 @@ function evcNum(v){
   return Number.isFinite(n) ? n : NaN;
 }
 
-/* Usure : vert tant qu'il reste de la marge, puis jaune, puis magenta —
-   les trois pétales du logo, dans l'ordre où on les lit. */
+/* Usure : verte tant qu'il reste de la marge, orange quand il faut y
+   penser, rouge quand la pièce est à changer. */
 function evcWearColor(w){
   if(isNaN(w)) return 'rgba(150,150,150,.7)';
-  if(w >= 85) return EVC_MAGENTA;
-  if(w >= 65) return EVC_YELLOW;
-  return EVC_GREEN;
+  if(w >= 85) return EVC_LOW;
+  if(w >= 65) return EVC_WARN;
+  return EVC_OK;
 }
 
 /* RE5 Plus vu de dessus : à cette taille, le plan lit mieux qu'une
@@ -118,7 +122,7 @@ class EzvizVacuumCard extends HTMLElement{
       name:null, battery:null, fault:null,
       image:null, image_docked:null,
       consumables:[], consumable_mode:'wear', show_hours:true,
-      font_scale:1, art_size:96, image_round:false,
+      font_scale:1, art_size:112, image_round:false,
       palette:null
     }, cfg);
     this._cons = (cfg.consumables || []).map(c =>
@@ -146,19 +150,24 @@ class EzvizVacuumCard extends HTMLElement{
     }
     ha-card{
       position:relative;overflow:hidden;container-type:inline-size;
-      padding:13px 18px;
-      background:var(--ha-card-background, var(--card-background-color, #1c1c1c));
+      padding:12px 16px;
       border-radius:var(--ha-card-border-radius, 16px);
-    }
-    /* Un simple trait de contour, neutre. La couleur d'état vit dans le
-       texte et l'animation du robot ; l'entourer d'un halo coloré alourdit
-       la carte pour rien. */
-    ha-card::after{
-      content:'';position:absolute;inset:0;border-radius:inherit;
-      pointer-events:none;
-      border:1px solid color-mix(in srgb, var(--primary-text-color) 9%, transparent);
+      /* Le liseré porte les cinq pétales du logo : deux fonds superposés,
+         l'un plein jusqu'au bord du padding, l'autre en dégradé jusqu'au
+         bord de la bordure — seule la bordure laisse voir le dégradé. */
+      border:1.5px solid transparent;
+      background:
+        linear-gradient(
+          var(--ha-card-background, var(--card-background-color, #1c1c1c)) 0 0)
+          padding-box,
+        conic-gradient(from 215deg,
+          var(--ez-blue), var(--ez-cyan) 18%, var(--ez-green) 40%,
+          var(--ez-yellow) 60%, var(--ez-magenta) 80%, var(--ez-blue))
+          border-box;
     }
 
+    /* Trois zones : le robot à gauche sur toute la hauteur, les commandes
+       empilées au milieu, l'état et la batterie à droite. */
     .row{display:flex;align-items:center;gap:14px}
 
     /* ---- le robot, mis en avant ---- */
@@ -167,10 +176,10 @@ class EzvizVacuumCard extends HTMLElement{
       cursor:pointer;position:relative;
       filter:drop-shadow(0 3px 7px rgba(0,0,0,.22));
     }
+    .art.photo{width:calc(var(--art) * 1.12)}
     .art svg{display:block;width:100%;height:100%}
     .art img{display:block;width:100%;height:100%;
       object-fit:contain;border-radius:10px}
-    .art.photo{width:calc(var(--art) * 1.18)}
     /* Le robot vu de dessus est rond : un cadrage circulaire fait disparaître
        les coins blancs de la photo produit, et le balayage vient alors
        épouser exactement le bord de la coque. */
@@ -213,12 +222,13 @@ class EzvizVacuumCard extends HTMLElement{
     .busy .halo{animation:evc-halo 2s ease-in-out infinite}
     @keyframes evc-halo{50%{opacity:.85}}
 
-    /* ---- nom et état ---- */
-    /* Le bloc texte occupe toute la place entre le robot et la batterie et
-       centre son contenu : on obtient trois zones nettes — robot à gauche,
-       état au milieu, batterie à droite — sans vide au milieu. */
-    .txt{flex:1 1 0;min-width:110px;display:flex;flex-direction:column;gap:2px;
-      align-items:center;text-align:center;cursor:pointer}
+    /* ---- colonne de droite : nom, état, batterie ---- */
+    .info{
+      flex:1 1 0;min-width:0;display:flex;flex-direction:column;
+      align-items:flex-end;justify-content:center;gap:5px;text-align:right;
+    }
+    .txt{min-width:0;max-width:100%;display:flex;flex-direction:column;gap:1px;
+      align-items:flex-end;cursor:pointer}
     .nm{
       font-size:calc(.68rem * var(--fs));font-weight:600;letter-spacing:.11em;
       text-transform:uppercase;opacity:.7;
@@ -247,37 +257,43 @@ class EzvizVacuumCard extends HTMLElement{
     .bat ha-icon{--mdc-icon-size:calc(20px * var(--fs))}
     .bat small{font-size:calc(.7rem * var(--fs));opacity:.7;margin-left:-1px}
 
-    /* ---- commandes ---- */
-    .cmd{flex:none;display:flex;gap:6px}
-    /* Pastilles ouvertes : un contour fin dans la couleur de la commande et
-       rien à l'intérieur. C'est la matière du logo — des formes douces,
-       posées sur du vide — pas des pavés de couleur. */
+    /* ---- commandes ----
+       Empilées au milieu, en pastilles ouvertes et neutres : la couleur de
+       la carte est déjà dans le liseré et dans l'état, les boutons n'ont pas
+       à en rajouter. */
+    .cmd{flex:none;display:flex;flex-direction:column;gap:6px}
     .b{
-      width:calc(38px * var(--fs));height:calc(32px * var(--fs));
+      width:calc(46px * var(--fs));height:calc(31px * var(--fs));
       border:0;border-radius:999px;cursor:pointer;padding:0;
       display:flex;align-items:center;justify-content:center;
       background:transparent;
       box-shadow:inset 0 0 0 1px
-        color-mix(in srgb, var(--bcol, var(--primary-text-color)) 38%, transparent);
+        color-mix(in srgb, var(--primary-text-color) 22%, transparent);
       transition:background .18s, box-shadow .18s;
       -webkit-tap-highlight-color:transparent;
     }
     .b:hover:not(:disabled){
-      background:color-mix(in srgb,
-        var(--bcol, var(--primary-text-color)) 12%, transparent)}
-    .b:disabled{opacity:.3;cursor:not-allowed}
-    /* L'icône porte sa couleur en permanence : le vert dit « démarrer »
-       même quand le robot est à la base. L'état actif remplit la pastille. */
+      background:color-mix(in srgb, var(--primary-text-color) 10%, transparent)}
+    .b:disabled{opacity:.28;cursor:not-allowed}
     .b ha-icon{--mdc-icon-size:calc(18px * var(--fs));
-      color:var(--bcol, var(--secondary-text-color));transition:color .18s}
+      color:var(--primary-text-color);opacity:.8;transition:opacity .18s}
+    /* La commande en cours : pastille remplie, contour franc. */
     .b.on{
-      background:color-mix(in srgb, var(--bcol) 16%, transparent);
-      box-shadow:inset 0 0 0 1.5px color-mix(in srgb, var(--bcol) 75%, transparent);
+      background:color-mix(in srgb, var(--primary-text-color) 14%, transparent);
+      box-shadow:inset 0 0 0 1.5px
+        color-mix(in srgb, var(--primary-text-color) 45%, transparent);
     }
-    .chev{background:transparent;box-shadow:none;width:calc(28px * var(--fs))}
-    .chev:hover:not(:disabled){background:transparent}
-    .chev ha-icon{--mdc-icon-size:calc(20px * var(--fs));opacity:.55}
-    .chev ha-icon{transition:transform .3s ease}
+    .b.on ha-icon{opacity:1}
+
+    /* Le chevron n'est pas une commande du robot : il reste en marge. */
+    .chev{
+      flex:none;align-self:stretch;width:calc(22px * var(--fs));height:auto;
+      background:transparent;box-shadow:none;border-radius:8px;
+    }
+    .chev:hover:not(:disabled){
+      background:color-mix(in srgb, var(--primary-text-color) 7%, transparent)}
+    .chev ha-icon{--mdc-icon-size:calc(20px * var(--fs));opacity:.5;
+      transition:transform .3s ease}
     .chev.open ha-icon{transform:rotate(180deg)}
 
     /* ---- entretien, replié ---- */
@@ -306,41 +322,40 @@ class EzvizVacuumCard extends HTMLElement{
     .bar i{display:block;height:100%;border-radius:999px;
       transition:width .6s ease}
 
-    /* Carte étroite : les commandes passent sur leur propre ligne et
-       s'étirent. Le texte récupère toute la largeur au lieu d'être tronqué,
-       et les boutons deviennent des cibles bien plus confortables. */
-    @container (max-width: 580px){
-      .row{flex-wrap:wrap}
-      .cmd{width:100%;gap:8px;margin-top:9px}
-      .b{flex:1 1 0;width:auto}
-      .chev{flex:0 0 calc(46px * var(--fs))}
-    }
-    @container (max-width: 400px){
-      .cons{grid-template-columns:1fr}
-      .nm{display:none}
-      .art{width:calc(var(--art) * .78);height:calc(var(--art) * .78)}
+    /* Carte étroite : la photo cède la place en premier, c'est elle qui
+       coûte le plus de largeur. */
+    @container (max-width: 420px){
+      .row{gap:10px}
+      .art{width:calc(var(--art) * .8);height:calc(var(--art) * .8)}
       .art.photo{width:calc(var(--art) * .9)}
+      .cons{grid-template-columns:1fr}
+    }
+    @container (max-width: 330px){
+      .nm{display:none}
+      .b{width:calc(40px * var(--fs))}
     }
     </style>
     <ha-card>
       <div class="row">
         <div class="art">` + art +
               `<div class="scan"></div><div class="pulse"></div></div>
-        <div class="txt">
-          <div class="nm"></div>
-          <div class="stt"><span class="dot"></span><span class="lbl"></span></div>
-        </div>
-        <div class="bat"><ha-icon></ha-icon><span class="pct"></span></div>
         <div class="cmd">
-          <button class="b go"    style="--bcol:var(--ez-green)" title="Démarrer">
+          <button class="b go" title="Démarrer">
             <ha-icon icon="mdi:play"></ha-icon></button>
-          <button class="b pause" style="--bcol:var(--ez-yellow)" title="Pause">
+          <button class="b pause" title="Pause">
             <ha-icon icon="mdi:pause"></ha-icon></button>
-          <button class="b home"  style="--bcol:var(--ez-blue)" title="Retour à la base">
+          <button class="b home" title="Retour à la base">
             <ha-icon icon="mdi:home-import-outline"></ha-icon></button>
-          <button class="b chev" title="Entretien">
-            <ha-icon icon="mdi:chevron-down"></ha-icon></button>
         </div>
+        <div class="info">
+          <div class="txt">
+            <div class="nm"></div>
+            <div class="stt"><span class="dot"></span><span class="lbl"></span></div>
+          </div>
+          <div class="bat"><ha-icon></ha-icon><span class="pct"></span></div>
+        </div>
+        <button class="b chev" title="Entretien">
+          <ha-icon icon="mdi:chevron-down"></ha-icon></button>
       </div>
       <div class="fold"><div class="foldin"><div class="cons"></div></div></div>
     </ha-card>`;
@@ -489,7 +504,7 @@ class EzvizVacuumCard extends HTMLElement{
     if(isNaN(pct) && st) pct = evcNum(st.attributes.battery_level);
     const charging = !!(st && st.attributes.in_charging) && pct < 100;
     const bcol = isNaN(pct) ? 'rgba(150,150,150,.7)'
-      : pct <= 20 ? EVC_MAGENTA : pct <= 50 ? EVC_YELLOW : EVC_GREEN;
+      : pct <= 20 ? EVC_LOW : pct <= 50 ? EVC_WARN : EVC_OK;
     const lvl = isNaN(pct) ? null : Math.round(pct / 10) * 10;
     e.batIcon.setAttribute('icon', isNaN(pct) ? 'mdi:battery-unknown'
       : charging ? 'mdi:battery-charging'
