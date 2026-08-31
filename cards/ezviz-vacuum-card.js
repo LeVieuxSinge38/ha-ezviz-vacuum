@@ -70,7 +70,7 @@ const EVC_ART = `
     </radialGradient>
   </defs>
   <circle class="halo" cx="50" cy="50" r="47" fill="none"
-          stroke="var(--vc)" stroke-width="2.5" opacity=".35"/>
+          stroke="var(--vc)" stroke-width="1.6" opacity=".35"/>
   <circle cx="50" cy="50" r="41" fill="url(#evcTop)"/>
   <circle cx="50" cy="50" r="41" fill="none" stroke="#ffffff"
           stroke-opacity=".7" stroke-width="1.2"/>
@@ -146,29 +146,26 @@ class EzvizVacuumCard extends HTMLElement{
     }
     ha-card{
       position:relative;overflow:hidden;container-type:inline-size;
-      padding:11px 16px;
-      background:
-        radial-gradient(130% 110% at 50% -25%, rgba(255,255,255,.08), transparent 62%),
-        var(--ha-card-background, var(--card-background-color, #1c1c1c));
+      padding:13px 18px;
+      background:var(--ha-card-background, var(--card-background-color, #1c1c1c));
       border-radius:var(--ha-card-border-radius, 16px);
     }
+    /* Un simple trait de contour, neutre. La couleur d'état vit dans le
+       texte et l'animation du robot ; l'entourer d'un halo coloré alourdit
+       la carte pour rien. */
     ha-card::after{
       content:'';position:absolute;inset:0;border-radius:inherit;
-      pointer-events:none;border:1px solid var(--vc);opacity:.22;
-    }
-    /* Un filet de marque, dans le seul bleu EZVIZ. */
-    ha-card::before{
-      content:'';position:absolute;top:0;left:0;right:0;height:2px;
-      pointer-events:none;background:var(--ez-blue);opacity:.6;
+      pointer-events:none;
+      border:1px solid color-mix(in srgb, var(--primary-text-color) 9%, transparent);
     }
 
-    .row{display:flex;align-items:center;gap:16px}
+    .row{display:flex;align-items:center;gap:14px}
 
     /* ---- le robot, mis en avant ---- */
     .art{
       flex:none;width:var(--art);height:var(--art);
       cursor:pointer;position:relative;
-      filter:drop-shadow(0 8px 16px rgba(0,0,0,.45));
+      filter:drop-shadow(0 3px 7px rgba(0,0,0,.22));
     }
     .art svg{display:block;width:100%;height:100%}
     .art img{display:block;width:100%;height:100%;
@@ -194,7 +191,7 @@ class EzvizVacuumCard extends HTMLElement{
     @keyframes evc-scan{to{transform:rotate(360deg)}}
     .pulse{
       position:absolute;inset:3px;border-radius:50%;pointer-events:none;
-      border:2.5px solid var(--vc);opacity:0;
+      border:1.5px solid var(--vc);opacity:0;
     }
     .art.busy .pulse{animation:evc-ring 1.8s ease-out infinite}
     @keyframes evc-ring{
@@ -223,58 +220,63 @@ class EzvizVacuumCard extends HTMLElement{
     .txt{flex:1 1 0;min-width:110px;display:flex;flex-direction:column;gap:2px;
       align-items:center;text-align:center;cursor:pointer}
     .nm{
-      font-size:calc(.82rem * var(--fs));font-weight:800;letter-spacing:.13em;
-      text-transform:uppercase;opacity:.9;
+      font-size:calc(.68rem * var(--fs));font-weight:600;letter-spacing:.11em;
+      text-transform:uppercase;opacity:.7;
       white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
       /* Gris, comme le mot « EZVIZ » du logo : c'est une étiquette, elle
          n'a aucune information à porter. */
       color:var(--secondary-text-color);
     }
     .stt{
-      display:flex;align-items:center;gap:7px;
-      font-size:calc(1.38rem * var(--fs));font-weight:700;color:var(--vc);
+      display:flex;align-items:center;gap:6px;
+      font-size:calc(1rem * var(--fs));font-weight:600;color:var(--vc);
       white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
       transition:color .4s ease;
     }
-    .dot{width:8px;height:8px;border-radius:50%;background:var(--vc);flex:none}
+    .dot{width:6px;height:6px;border-radius:50%;background:var(--vc);flex:none}
     .busy .dot{animation:evc-dot 1.3s ease-in-out infinite}
     @keyframes evc-dot{50%{opacity:.25;transform:scale(.7)}}
     .stt.err{color:var(--ez-magenta)}
 
     /* ---- batterie ---- */
     .bat{
-      flex:none;display:flex;align-items:center;gap:5px;
-      font-size:calc(1.38rem * var(--fs));font-weight:700;
+      flex:none;display:flex;align-items:center;gap:4px;
+      font-size:calc(1rem * var(--fs));font-weight:600;
       color:var(--bc);font-variant-numeric:tabular-nums;
     }
-    .bat ha-icon{--mdc-icon-size:calc(26px * var(--fs))}
-    .bat small{font-size:calc(.78rem * var(--fs));opacity:.75;margin-left:-2px}
+    .bat ha-icon{--mdc-icon-size:calc(20px * var(--fs))}
+    .bat small{font-size:calc(.7rem * var(--fs));opacity:.7;margin-left:-1px}
 
     /* ---- commandes ---- */
     .cmd{flex:none;display:flex;gap:6px}
+    /* Pastilles ouvertes : un contour fin dans la couleur de la commande et
+       rien à l'intérieur. C'est la matière du logo — des formes douces,
+       posées sur du vide — pas des pavés de couleur. */
     .b{
-      width:calc(38px * var(--fs));height:calc(36px * var(--fs));
-      border:0;border-radius:12px;cursor:pointer;padding:0;
+      width:calc(38px * var(--fs));height:calc(32px * var(--fs));
+      border:0;border-radius:999px;cursor:pointer;padding:0;
       display:flex;align-items:center;justify-content:center;
-      background:color-mix(in srgb,
-        var(--bcol, var(--primary-text-color)) 13%, transparent);
+      background:transparent;
+      box-shadow:inset 0 0 0 1px
+        color-mix(in srgb, var(--bcol, var(--primary-text-color)) 38%, transparent);
       transition:background .18s, box-shadow .18s;
       -webkit-tap-highlight-color:transparent;
     }
     .b:hover:not(:disabled){
       background:color-mix(in srgb,
-        var(--bcol, var(--primary-text-color)) 26%, transparent)}
-    .b:disabled{opacity:.28;cursor:not-allowed}
+        var(--bcol, var(--primary-text-color)) 12%, transparent)}
+    .b:disabled{opacity:.3;cursor:not-allowed}
     /* L'icône porte sa couleur en permanence : le vert dit « démarrer »
-       même quand le robot est à la base. L'état actif se marque par le fond
-       plus dense et le liseré, plus par la couleur. */
-    .b ha-icon{--mdc-icon-size:calc(22px * var(--fs));
+       même quand le robot est à la base. L'état actif remplit la pastille. */
+    .b ha-icon{--mdc-icon-size:calc(18px * var(--fs));
       color:var(--bcol, var(--secondary-text-color));transition:color .18s}
     .b.on{
-      background:color-mix(in srgb, var(--bcol) 30%, transparent);
-      box-shadow:inset 0 0 0 1.5px color-mix(in srgb, var(--bcol) 70%, transparent);
+      background:color-mix(in srgb, var(--bcol) 16%, transparent);
+      box-shadow:inset 0 0 0 1.5px color-mix(in srgb, var(--bcol) 75%, transparent);
     }
-    .chev{background:transparent;width:calc(28px * var(--fs))}
+    .chev{background:transparent;box-shadow:none;width:calc(28px * var(--fs))}
+    .chev:hover:not(:disabled){background:transparent}
+    .chev ha-icon{--mdc-icon-size:calc(20px * var(--fs));opacity:.55}
     .chev ha-icon{transition:transform .3s ease}
     .chev.open ha-icon{transform:rotate(180deg)}
 
@@ -292,14 +294,14 @@ class EzvizVacuumCard extends HTMLElement{
     }
     .c .l{display:flex;align-items:baseline;gap:6px;margin-bottom:4px}
     .c .k{
-      flex:1 1 auto;min-width:0;font-size:calc(.84rem * var(--fs));
-      font-weight:600;color:var(--secondary-text-color);
+      flex:1 1 auto;min-width:0;font-size:calc(.78rem * var(--fs));
+      font-weight:500;color:var(--secondary-text-color);
       white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
     }
-    .c .v{flex:none;font-size:calc(.88rem * var(--fs));font-weight:700;
+    .c .v{flex:none;font-size:calc(.82rem * var(--fs));font-weight:600;
       color:var(--wc);font-variant-numeric:tabular-nums}
     .c .v small{font-size:calc(.74rem * var(--fs));opacity:.7}
-    .bar{height:5px;border-radius:999px;overflow:hidden;
+    .bar{height:3px;border-radius:999px;overflow:hidden;
       background:color-mix(in srgb, var(--primary-text-color) 10%, transparent)}
     .bar i{display:block;height:100%;border-radius:999px;
       transition:width .6s ease}
