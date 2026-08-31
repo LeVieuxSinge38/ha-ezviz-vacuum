@@ -121,7 +121,7 @@ class EzvizVacuumCard extends HTMLElement{
     this._cfg = Object.assign({
       name:null, battery:null, fault:null,
       image:null, image_docked:null,
-      consumables:[], consumable_mode:'wear', show_hours:true,
+      consumables:[], consumable_mode:'wear', show_hours:true, alert_wear:85,
       font_scale:1, art_size:112, image_round:false,
       palette:null
     }, cfg);
@@ -164,6 +164,22 @@ class EzvizVacuumCard extends HTMLElement{
           var(--ez-blue), var(--ez-cyan) 18%, var(--ez-green) 40%,
           var(--ez-yellow) 60%, var(--ez-magenta) 80%, var(--ez-blue))
           border-box;
+    }
+
+    /* Alerte d'entretien : un point rouge dans le coin, qui bat lentement.
+       C'est la seule chose de la carte qui a le droit d'attirer l'œil. */
+    .badge{
+      position:absolute;top:7px;left:10px;z-index:2;
+      width:17px;height:17px;border-radius:50%;
+      display:flex;align-items:center;justify-content:center;
+      background:#e04b4b;color:#fff;
+      font-size:12px;font-weight:800;line-height:1;
+      box-shadow:0 0 0 3px color-mix(in srgb, #e04b4b 22%, transparent);
+      animation:evc-badge 1.6s ease-in-out infinite;pointer-events:auto;
+      cursor:default;
+    }
+    @keyframes evc-badge{
+      50%{opacity:.35;box-shadow:0 0 0 6px color-mix(in srgb, #e04b4b 0%, transparent)}
     }
 
     /* Trois zones : le robot à gauche sur toute la hauteur, les commandes
@@ -222,21 +238,6 @@ class EzvizVacuumCard extends HTMLElement{
     .busy .halo{animation:evc-halo 2s ease-in-out infinite}
     @keyframes evc-halo{50%{opacity:.85}}
 
-    /* ---- zone centrale ----
-       Sur une carte large il reste un grand vide entre les commandes et
-       l'état. Plutôt que de l'étaler, on y remonte l'entretien : la même
-       information que sous le chevron, mais lisible sans un geste. Elle
-       n'apparaît qu'à partir d'une largeur où elle tient à l'aise. */
-    .mid{display:none;flex:1 1 0;min-width:0}
-    .mid .cons{
-      margin:0;padding:0;border-top:0;
-      grid-template-columns:repeat(auto-fit, minmax(128px, 1fr));
-      gap:6px 20px;
-    }
-    .mid .c .k{font-size:calc(.72rem * var(--fs))}
-    .mid .c .v{font-size:calc(.76rem * var(--fs))}
-    .mid .c .l{margin-bottom:3px}
-
     /* ---- colonne de droite : nom, état, batterie ---- */
     .info{
       flex:1 1 0;min-width:0;display:flex;flex-direction:column;
@@ -276,11 +277,14 @@ class EzvizVacuumCard extends HTMLElement{
        Empilées au milieu, en pastilles ouvertes et neutres : la couleur de
        la carte est déjà dans le liseré et dans l'état, les boutons n'ont pas
        à en rajouter. */
-    .cmd{flex:none;display:flex;flex-direction:column;gap:6px}
+    /* Les commandes prennent une part de la largeur : sur une carte large
+       elles s'étirent au lieu de laisser un trou au milieu. */
+    .cmd{flex:none;width:clamp(46px, 20%, 172px);
+      display:flex;flex-direction:column;gap:6px}
     .b{
-      width:calc(46px * var(--fs));height:calc(31px * var(--fs));
+      width:100%;height:calc(31px * var(--fs));
       border:0;border-radius:999px;cursor:pointer;padding:0;
-      display:flex;align-items:center;justify-content:center;
+      display:flex;align-items:center;justify-content:center;gap:7px;
       background:transparent;
       box-shadow:inset 0 0 0 1px
         color-mix(in srgb, var(--primary-text-color) 22%, transparent);
@@ -299,10 +303,17 @@ class EzvizVacuumCard extends HTMLElement{
         color-mix(in srgb, var(--primary-text-color) 45%, transparent);
     }
     .b.on ha-icon{opacity:1}
+    /* Le libellé n'apparaît que si le bouton est assez large pour le porter
+       en entier : jamais de texte tronqué. */
+    .bl{display:none;font-size:calc(.78rem * var(--fs));font-weight:600;
+      color:var(--primary-text-color);opacity:.8;white-space:nowrap}
+    .b.on .bl{opacity:1}
+    @container (min-width: 620px){ .bl{display:inline} }
 
     /* Le chevron n'est pas une commande du robot : il reste en marge. */
     .chev{
-      flex:none;align-self:stretch;width:calc(22px * var(--fs));height:auto;
+      flex:none;align-self:stretch;width:calc(22px * var(--fs)) !important;
+      height:auto;
       background:transparent;box-shadow:none;border-radius:8px;
     }
     .chev:hover:not(:disabled){
@@ -337,15 +348,6 @@ class EzvizVacuumCard extends HTMLElement{
     .bar i{display:block;height:100%;border-radius:999px;
       transition:width .6s ease}
 
-    /* Carte large : l'entretien occupe le centre, le chevron n'a plus
-       rien à déplier et s'efface. */
-    @container (min-width: 660px){
-      .mid{display:block}
-      .info{flex:0 0 auto}
-      .chev{display:none !important}
-      .fold{display:none}
-    }
-
     /* Carte étroite : la photo cède la place en premier, c'est elle qui
        coûte le plus de largeur. */
     @container (max-width: 420px){
@@ -356,22 +358,22 @@ class EzvizVacuumCard extends HTMLElement{
     }
     @container (max-width: 330px){
       .nm{display:none}
-      .b{width:calc(40px * var(--fs))}
+      .cmd{width:calc(40px * var(--fs))}
     }
     </style>
     <ha-card>
+      <div class="badge" style="display:none">!</div>
       <div class="row">
         <div class="art">` + art +
               `<div class="scan"></div><div class="pulse"></div></div>
         <div class="cmd">
           <button class="b go" title="Démarrer">
-            <ha-icon icon="mdi:play"></ha-icon></button>
+            <ha-icon icon="mdi:play"></ha-icon><span class="bl">Démarrer</span></button>
           <button class="b pause" title="Pause">
-            <ha-icon icon="mdi:pause"></ha-icon></button>
+            <ha-icon icon="mdi:pause"></ha-icon><span class="bl">Pause</span></button>
           <button class="b home" title="Retour à la base">
-            <ha-icon icon="mdi:home-import-outline"></ha-icon></button>
+            <ha-icon icon="mdi:home-import-outline"></ha-icon><span class="bl">Base</span></button>
         </div>
-        <div class="mid"><div class="cons inline"></div></div>
         <div class="info">
           <div class="txt">
             <div class="nm"></div>
@@ -394,8 +396,8 @@ class EzvizVacuumCard extends HTMLElement{
       batIcon:r.querySelector('.bat ha-icon'), pct:r.querySelector('.pct'),
       go:r.querySelector('.go'), pause:r.querySelector('.pause'),
       home:r.querySelector('.home'), chev:r.querySelector('.chev'),
-      fold:r.querySelector('.fold'), cons:r.querySelector('.fold .cons'),
-      consMid:r.querySelector('.cons.inline')
+      fold:r.querySelector('.fold'), cons:r.querySelector('.cons'),
+      badge:r.querySelector('.badge')
     };
     this._el.card.style.setProperty('--fs', String(this._cfg.font_scale));
     this._el.card.style.setProperty('--art', this._cfg.art_size + 'px');
@@ -544,6 +546,9 @@ class EzvizVacuumCard extends HTMLElement{
        Le capteur donne les heures restantes, son attribut les heures faites :
        leur somme est la durée de vie totale, d'où l'usure. */
     const wearMode = c.consumable_mode !== 'remaining';
+    const alertAt = evcNum(c.alert_wear);
+    const seuil = isNaN(alertAt) ? 85 : alertAt;
+    const worn = [];
     let rows = '';
     for(const cons of this._cons){
       const cs = this._hass.states[cons.entity];
@@ -559,6 +564,7 @@ class EzvizVacuumCard extends HTMLElement{
           const wear = Math.round((used / total) * 100);
           const shown = wearMode ? wear : 100 - wear;
           col = evcWearColor(wear);
+          if(wear >= seuil) worn.push(label);
           pctBar = shown;
           val = shown + '<small>%</small>' +
             (c.show_hours ? ' <small>· ' + Math.round(remain) + ' h</small>' : '');
@@ -572,11 +578,15 @@ class EzvizVacuumCard extends HTMLElement{
         '<div class="bar"><i style="width:' + pctBar + '%;background:' +
         col + '"></i></div></div>';
     }
-    /* Le même balisage sert aux deux emplacements ; la largeur de la carte
-       décide lequel est visible. */
     e.cons.innerHTML = rows;
-    e.consMid.innerHTML = rows;
     e.chev.style.display = rows ? '' : 'none';
+
+    /* Un consommable en fin de vie n'a pas à attendre qu'on déplie la carte :
+       un point rouge clignotant le signale, et son infobulle dit lequel. */
+    e.badge.style.display = worn.length ? '' : 'none';
+    e.badge.title = worn.length
+      ? 'À remplacer : ' + worn.join(', ')
+      : '';
 
     /* ---- commandes ---- */
     const dead = !st || state === 'unavailable';
