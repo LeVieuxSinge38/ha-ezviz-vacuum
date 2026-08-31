@@ -44,6 +44,26 @@ const EVC_FAULTS = {
   CR_DockPumpSewageFail:'Vidange impossible'
 };
 
+/* Le sélecteur de couleur de Home Assistant travaille en [r, g, b] ; la
+   carte, elle, écrit du CSS. On traduit dans les deux sens. */
+function evcToCss(v){
+  if(Array.isArray(v) && v.length === 3) return 'rgb(' + v.join(',') + ')';
+  return typeof v === 'string' && v ? v : null;
+}
+function evcToRgb(v){
+  if(Array.isArray(v) && v.length === 3) return v;
+  if(typeof v !== 'string') return null;
+  let h = v.trim();
+  const m = h.match(/^rgba?\((\d+)[ ,]+(\d+)[ ,]+(\d+)/i);
+  if(m) return [+m[1], +m[2], +m[3]];
+  if(h[0] !== '#') return null;
+  h = h.slice(1);
+  if(h.length === 3) h = h[0]+h[0]+h[1]+h[1]+h[2]+h[2];
+  if(h.length !== 6) return null;
+  return [parseInt(h.slice(0,2),16), parseInt(h.slice(2,4),16),
+          parseInt(h.slice(4,6),16)];
+}
+
 function evcNum(v){
   if(v === null || v === undefined) return NaN;
   const t = String(v).trim();
@@ -404,8 +424,10 @@ class EzvizVacuumCard extends HTMLElement{
     /* `palette: {blue, cyan, green, yellow, magenta}` permet d'ajuster les
        teintes de marque sans toucher au code. */
     const pal = this._cfg.palette || {};
-    for(const k of ['blue', 'cyan', 'green', 'yellow', 'magenta'])
-      if(pal[k]) this.style.setProperty('--ez-' + k, pal[k]);
+    for(const k of ['blue', 'cyan', 'green', 'yellow', 'magenta']){
+      const v = evcToCss(pal[k]);
+      if(v) this.style.setProperty('--ez-' + k, v);
+    }
     this._el.art.classList.toggle('photo', this._photo);
 
     this._el.go.addEventListener('click', () => this._call('start'));
@@ -599,8 +621,162 @@ class EzvizVacuumCard extends HTMLElement{
   }
 
   getCardSize(){ return 2; }
-  static getStubConfig(){ return {entity:'vacuum.robot'}; }
+
+  /* Home Assistant appelle ces deux méthodes pour l'interface de
+     configuration : la première fournit l'éditeur, la seconde la carte
+     d'exemple proposée quand on l'ajoute au tableau de bord. */
+  static getConfigElement(){
+    return document.createElement('ezviz-vacuum-card-editor');
+  }
+  static getStubConfig(hass){
+    const first = hass
+      ? Object.keys(hass.states).find(id => id.startsWith('vacuum.'))
+      : null;
+    return {entity:first || 'vacuum.robot'};
+  }
 }
+
+/* ---------------------------------------------------------------------
+   Éditeur visuel. Home Assistant l'ouvre quand on clique « Modifier » sur
+   la carte ; il repose sur `ha-form`, donc on hérite des sélecteurs natifs
+   (choix d'entité, curseurs, pastille de couleur) sans les réécrire.
+   --------------------------------------------------------------------- */
+const EVC_DEFAULT_PALETTE = {
+  blue:EVC_BLUE, cyan:EVC_CYAN, green:EVC_GREEN,
+  yellow:EVC_YELLOW, magenta:EVC_MAGENTA
+};
+
+const EVC_SCHEMA = [
+  {name:'entity', required:true, selector:{entity:{domain:'vacuum'}}},
+  {name:'name', selector:{text:{}}},
+  {name:'battery',
+   selector:{entity:{domain:'sensor', device_class:'battery'}}},
+  {name:'fault', selector:{entity:{domain:'sensor'}}},
+  {name:'consumables',
+   selector:{entity:{domain:'sensor', multiple:true}}},
+
+  {name:'photos', type:'expandable', iconPath:null, schema:[
+    {name:'image_docked', selector:{text:{}}},
+    {name:'image', selector:{text:{}}},
+    {name:'image_round', selector:{boolean:{}}}
+  ]},
+
+  {name:'mise_en_page', type:'expandable', schema:[
+    {name:'art_size',
+     selector:{number:{min:64, max:180, step:2, mode:'slider'}}},
+    {name:'font_scale',
+     selector:{number:{min:.7, max:1.4, step:.02, mode:'slider'}}}
+  ]},
+
+  {name:'entretien', type:'expandable', schema:[
+    {name:'consumable_mode', selector:{select:{mode:'dropdown', options:[
+      {value:'wear', label:'Usure (100 % = à remplacer)'},
+      {value:'remaining', label:'Restant (0 % = à remplacer)'}
+    ]}}},
+    {name:'alert_wear',
+     selector:{number:{min:50, max:100, step:1, mode:'slider'}}},
+    {name:'show_hours', selector:{boolean:{}}},
+    {name:'expanded', selector:{boolean:{}}}
+  ]},
+
+  {name:'palette', type:'expandable', schema:[
+    {name:'blue', selector:{color_rgb:{}}},
+    {name:'cyan', selector:{color_rgb:{}}},
+    {name:'green', selector:{color_rgb:{}}},
+    {name:'yellow', selector:{color_rgb:{}}},
+    {name:'magenta', selector:{color_rgb:{}}}
+  ]}
+];
+
+const EVC_LABELS = {
+  entity:'Aspirateur', name:'Titre affiché',
+  battery:'Capteur de batterie', fault:'Capteur de panne',
+  consumables:'Consommables suivis',
+  photos:'Photos', image_docked:'Photo sur la base',
+  image:'Photo en fonctionnement', image_round:'Recadrer la photo en rond',
+  mise_en_page:'Mise en page',
+  art_size:'Taille de la photo (px)', font_scale:'Taille du texte',
+  entretien:'Entretien', consumable_mode:'Afficher',
+  alert_wear:'Seuil du badge d\'alerte (%)',
+  show_hours:'Afficher les heures restantes',
+  expanded:'Entretien déplié par défaut',
+  palette:'Couleurs',
+  blue:'Bleu', cyan:'Cyan', green:'Vert', yellow:'Jaune', magenta:'Magenta'
+};
+
+const EVC_HELPERS = {
+  image_docked:'Adresse média, par exemple media-source://media_source/local/re5-base.png',
+  image:'Affichée dès que le robot quitte sa base.',
+  alert_wear:'Au-delà, un point rouge clignote dans le coin de la carte.',
+  art_size:'C\'est elle qui fixe la hauteur de la carte.'
+};
+
+class EzvizVacuumCardEditor extends HTMLElement{
+  setConfig(config){
+    this._config = config || {};
+    this._render();
+  }
+  set hass(h){
+    this._hass = h;
+    if(this._form) this._form.hass = h;
+  }
+
+  _render(){
+    if(!this._form){
+      const f = document.createElement('ha-form');
+      f.computeLabel = sc => EVC_LABELS[sc.name] || sc.name;
+      f.computeHelper = sc => EVC_HELPERS[sc.name] || '';
+      f.addEventListener('value-changed', ev => {
+        ev.stopPropagation();
+        this.dispatchEvent(new CustomEvent('config-changed', {
+          detail:{config:this._toConfig(ev.detail.value)},
+          bubbles:true, composed:true
+        }));
+      });
+      this.appendChild(f);
+      this._form = f;
+    }
+    this._form.schema = EVC_SCHEMA;
+    if(this._hass) this._form.hass = this._hass;
+    this._form.data = this._toForm(this._config);
+  }
+
+  /* Config → formulaire : les consommables peuvent être décrits par un objet
+     {entity, name}, le sélecteur n'accepte que des identifiants ; les
+     couleurs sont du CSS, la pastille veut du [r, g, b]. */
+  _toForm(cfg){
+    const pal = cfg.palette || {};
+    const out = Object.assign({}, cfg, {
+      consumables:(cfg.consumables || []).map(
+        c => typeof c === 'string' ? c : c.entity),
+      palette:{}
+    });
+    for(const k of Object.keys(EVC_DEFAULT_PALETTE))
+      out.palette[k] = evcToRgb(pal[k]) || evcToRgb(EVC_DEFAULT_PALETTE[k]);
+    return out;
+  }
+
+  /* Formulaire → config : on refait le chemin inverse, et on n'écrit une
+     couleur que si elle s'écarte de celle du logo. */
+  _toConfig(data){
+    const out = Object.assign({type:this._config.type}, data);
+    const pal = {};
+    for(const k of Object.keys(EVC_DEFAULT_PALETTE)){
+      const css = evcToCss(data.palette && data.palette[k]);
+      const def = evcToCss(EVC_DEFAULT_PALETTE[k]);
+      if(css && css !== def &&
+         String(evcToRgb(css)) !== String(evcToRgb(def))) pal[k] = css;
+    }
+    if(Object.keys(pal).length) out.palette = pal;
+    else delete out.palette;
+    for(const k of Object.keys(out))
+      if(out[k] === undefined || out[k] === '') delete out[k];
+    return out;
+  }
+}
+
+if(!customElements.get('ezviz-vacuum-card-editor'))
+  customElements.define('ezviz-vacuum-card-editor', EzvizVacuumCardEditor);
 
 if(!customElements.get('ezviz-vacuum-card'))
   customElements.define('ezviz-vacuum-card', EzvizVacuumCard);
