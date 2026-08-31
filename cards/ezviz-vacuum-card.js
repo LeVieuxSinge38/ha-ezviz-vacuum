@@ -4,11 +4,10 @@
    fois par mois, il n'a rien à faire en permanence sur un tableau de bord.
    Toutes les tailles dérivent de --fs, réglable par font_scale. */
 
-/* Palette du logo EZVIZ : quatre pétales — bleu, vert, jaune, magenta — et
-   un gris de mot-clé. Relevés sur le logo couleur, pas sur une charte
-   officielle : ils restent réglables par l'option `palette`.
-   Toute la carte n'utilise que ces quatre teintes, le gris servant aux
-   états neutres. */
+/* Couleurs relevées sur le logo EZVIZ. Elles ne servent qu'à porter une
+   information — l'état du robot, la fonction d'un bouton, un niveau —
+   jamais à décorer : le fond, le titre et les bordures restent neutres.
+   Réglables par l'option `palette`. */
 const EVC_BLUE    = '#1d9cd8';  // pétale bleu
 const EVC_CYAN    = '#4cc3ec';  // bord clair du pétale bleu
 const EVC_GREEN   = '#8cc63f';  // pétale vert
@@ -150,14 +149,6 @@ class EzvizVacuumCard extends HTMLElement{
       padding:16px 18px;
       background:
         radial-gradient(130% 110% at 50% -25%, rgba(255,255,255,.08), transparent 62%),
-        radial-gradient(70% 130% at 0% 0%,
-          color-mix(in srgb, var(--ez-blue) 13%, transparent), transparent 70%),
-        radial-gradient(60% 120% at 38% 100%,
-          color-mix(in srgb, var(--ez-green) 10%, transparent), transparent 70%),
-        radial-gradient(65% 130% at 100% 100%,
-          color-mix(in srgb, var(--ez-magenta) 11%, transparent), transparent 70%),
-        radial-gradient(55% 110% at 82% 0%,
-          color-mix(in srgb, var(--ez-yellow) 9%, transparent), transparent 70%),
         var(--ha-card-background, var(--card-background-color, #1c1c1c));
       border-radius:var(--ha-card-border-radius, 16px);
     }
@@ -165,15 +156,10 @@ class EzvizVacuumCard extends HTMLElement{
       content:'';position:absolute;inset:0;border-radius:inherit;
       pointer-events:none;border:1px solid var(--vc);opacity:.22;
     }
-    /* Filet de marque en haut de carte : les quatre pétales du logo,
-       dans l'ordre où ils tournent. */
+    /* Un filet de marque, dans le seul bleu EZVIZ. */
     ha-card::before{
-      content:'';position:absolute;top:0;left:0;right:0;height:3px;
-      pointer-events:none;
-      background:linear-gradient(90deg,
-        var(--ez-blue), var(--ez-cyan) 26%, var(--ez-green) 52%,
-        var(--ez-yellow) 76%, var(--ez-magenta));
-      opacity:.95;
+      content:'';position:absolute;top:0;left:0;right:0;height:2px;
+      pointer-events:none;background:var(--ez-blue);opacity:.6;
     }
 
     .row{display:flex;align-items:center;gap:16px}
@@ -235,17 +221,11 @@ class EzvizVacuumCard extends HTMLElement{
       cursor:pointer}
     .nm{
       font-size:calc(.82rem * var(--fs));font-weight:800;letter-spacing:.13em;
-      text-transform:uppercase;opacity:.95;
+      text-transform:uppercase;opacity:.9;
       white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
-      /* Le nom porte le dégradé complet : la marque est là, sans un aplat
-         de couleur de plus. La propriete color reste la solution de repli si le
-         navigateur ignore background-clip. */
-      color:var(--ez-blue);
-      background:linear-gradient(90deg,
-        var(--ez-blue), var(--ez-green) 42%, var(--ez-yellow) 68%,
-        var(--ez-magenta));
-      -webkit-background-clip:text;background-clip:text;
-      -webkit-text-fill-color:transparent;
+      /* Gris, comme le mot « EZVIZ » du logo : c'est une étiquette, elle
+         n'a aucune information à porter. */
+      color:var(--secondary-text-color);
     }
     .stt{
       display:flex;align-items:center;gap:7px;
@@ -288,7 +268,6 @@ class EzvizVacuumCard extends HTMLElement{
     }
     .b.on ha-icon{color:var(--bcol)}
     .chev{background:transparent;width:calc(28px * var(--fs))}
-    .chev ha-icon{color:var(--ez-magenta)}
     .chev ha-icon{transition:transform .3s ease}
     .chev.open ha-icon{transform:rotate(180deg)}
 
