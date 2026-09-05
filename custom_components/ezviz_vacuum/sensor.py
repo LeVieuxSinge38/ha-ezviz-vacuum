@@ -14,7 +14,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from . import EzvizVacuumConfigEntry
-from .const import CONSUMABLES, FAN_SPEEDS
+from .const import CONSUMABLES
 from .entity import EzvizVacuumBaseEntity
 
 
@@ -28,7 +28,6 @@ async def async_setup_entry(
     for serial in coordinator.devices:
         entities.append(EzvizVacuumBattery(coordinator, serial))
         entities.append(EzvizVacuumError(coordinator, serial))
-        entities.append(EzvizVacuumFanMode(coordinator, serial))
         entities.extend(
             EzvizVacuumConsumable(coordinator, serial, key, label)
             for key, label in CONSUMABLES.values()
@@ -77,27 +76,6 @@ class EzvizVacuumError(EzvizVacuumBaseEntity, SensorEntity):
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
         return {"description": self._task.get("exceptionDesc") or ""}
-
-
-class EzvizVacuumFanMode(EzvizVacuumBaseEntity, SensorEntity):
-    """Puissance d'aspiration configurée sur le robot.
-
-    Doublon assumé du `fan_speed` de l'entité aspirateur, qui lui se règle.
-    Ce capteur est conservé parce qu'il existait avant, et qu'on ne casse pas
-    les tableaux de bord qui le citent déjà.
-    """
-
-    _attr_entity_category = EntityCategory.DIAGNOSTIC
-    _attr_name = "Aspiration"
-
-    def __init__(self, coordinator, serial: str) -> None:
-        super().__init__(coordinator, serial)
-        self._attr_unique_id = f"{serial}_fan_mode"
-
-    @property
-    def native_value(self) -> str | None:
-        mode = self._std_clean.get("fanMode")
-        return FAN_SPEEDS.get(mode, mode)
 
 
 class EzvizVacuumConsumable(EzvizVacuumBaseEntity, SensorEntity):

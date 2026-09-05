@@ -1,11 +1,36 @@
-# ha-ezviz-vacuum
+# Intégration Home Assistant pour aspirateur robot EZVIZ (RE5 Plus)
 
-Intégration Home Assistant pour les aspirateurs robots **EZVIZ**, développée
-et validée sur un **EZVIZ RE5 Plus (CS-RE5P-TWT)**.
+Piloter un **robot aspirateur EZVIZ** depuis **Home Assistant** : démarrage,
+pause, retour à la base, **puissance d'aspiration**, **volume d'eau**,
+batterie et usure des consommables. Développée et validée sur un
+**EZVIZ RE5 Plus (CS-RE5P-TWT)**.
+
+*Home Assistant custom integration for **EZVIZ robot vacuums** — start, pause,
+return to dock, **suction power**, **water level**, battery and consumable
+wear. Built and tested on an EZVIZ RE5 Plus.*
+
+Avec une carte Lovelace assortie.
 
 L'intégration officielle `ezviz` ne gère que les caméras, sonnettes, ampoules
 et prises : les robots ne correspondent à aucune de ses catégories d'appareil.
 Celle-ci parle au même cloud, par le bus « iot-feature ».
+
+**Modèles.** Validé sur le RE5 Plus. Les autres robots EZVIZ — RE4, RE5,
+RE7, RS2, RS20, RC3 — utilisent vraisemblablement le même bus : les outils de
+`tools/` permettent de le vérifier en quelques minutes.
+
+## Installation
+
+**Par HACS** (recommandé) : HACS → Intégrations → menu ⋮ → *Dépôts
+personnalisés* → coller l'adresse de ce dépôt, catégorie *Integration*.
+Puis installer, redémarrer Home Assistant, et ajouter l'intégration
+« EZVIZ Vacuum » avec les identifiants de ton compte EZVIZ.
+
+**À la main** : copier `custom_components/ezviz_vacuum/` dans le dossier
+`custom_components/` de ta configuration, puis redémarrer.
+
+**La carte** : copier `cards/ezviz-vacuum-card.js` dans `www/`, puis
+l'ajouter en ressource Lovelace (`/local/ezviz-vacuum-card.js`, type module).
 
 ## Ce que ça donne
 
