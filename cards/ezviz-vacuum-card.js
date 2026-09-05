@@ -96,7 +96,7 @@ class EzvizVacuumCard extends HTMLElement{
       name:null, battery:null, fault:null,
       consumables:[], consumable_mode:'wear', show_hours:true, alert_wear:85,
       font_scale:1, size:56,
-      stuck_after:2, unstick_delay:5
+      stuck_delay:5, unstick_delay:5
     }, cfg);
 
     this._cons = (cfg.consumables || []).map(c =>
@@ -385,7 +385,7 @@ class EzvizVacuumCard extends HTMLElement{
           String(fs.state).toLowerCase())) return true;
     }
 
-    const seuil = evcNum(c.stuck_after) || 2;
+    const seuil = evcNum(c.stuck_delay) || 5;   // en secondes
     const a = st.attributes || {};
 
     /* Un dépannage remet le compteur à zéro. Sans ça, le robot met jusqu'à
@@ -394,24 +394,26 @@ class EzvizVacuumCard extends HTMLElement{
        triangle réapparaîtrait aussitôt après avoir été pressé. */
     const depuis = (horodatage) =>
       (Date.now() - Math.max(new Date(horodatage).getTime(),
-                             this._fixedAt || 0)) / 60000;
+                             this._fixedAt || 0)) / 1000;
 
-    /* Muet et hors de sa base — le cas des vrais blocages. Ce qui borne ce
-       seuil par le bas, c'est le clignotement de `task_state` : il alterne
-       toutes les 20 à 40 secondes pendant un nettoyage normal. Deux minutes
-       laissent trois fois cette marge ; descendre à une minute ferait
-       clignoter le triangle alors que tout va bien. */
-    if(!a.in_charging && !a.task_state) return depuis(st.last_updated) >= seuil;
+    /* Muet et hors de sa base. Ce chemin garde un plancher de 45 secondes,
+       quel que soit le réglage : pendant un nettoyage normal, `task_state`
+       se vide par intermittence jusqu'à 40 secondes d'affilée. En dessous,
+       le triangle clignoterait pendant qu'il travaille. */
+    if(!a.in_charging && !a.task_state)
+      return depuis(st.last_updated) >= Math.max(seuil, 45);
 
     /* Arrêté et bavard : le robot annonce un état au lieu de se taire.
-       Même seuil que le silence — un seul réglage, un seul comportement.
 
-       Ne pas le descendre par réflexe : « à l'arrêt » n'est pas rare et
-       n'est presque jamais un blocage. Sur dix jours d'historique, dix-sept
-       passages en `idle` se sont résolus seuls, de 23 secondes à 2 min 22,
-       la moitié suivis d'un retour en nettoyage. À deux minutes, un seul
-       d'entre eux déclencherait encore ; à deux secondes, les dix-sept —
-       et chacun invite à appuyer sur un bouton qui relance une session. */
+       C'est ce chemin que règle `stuck_delay`, et il peut descendre très
+       bas : contrairement au silence, « à l'arrêt » n'apparaît pas par
+       intermittence pendant une session.
+
+       Le défaut de 5 s est délibérément agressif, pour un usage avec un
+       bébé et des jouets par terre : les blocages y sont fréquents et
+       brefs, et mieux vaut un triangle de trop qu'un robot qui attend. À
+       ajuster à l'usage — l'historique montre des arrêts d'une trentaine de
+       secondes qui se résolvent seuls. */
     if(st.state === 'idle') return depuis(st.last_changed) >= seuil;
 
     return false;
@@ -467,8 +469,11 @@ class EzvizVacuumCard extends HTMLElement{
      par demi-minute, uniquement pour regarder l'heure. */
   connectedCallback(){
     const rafraichir = () => { if(this._built && this._hass) this._paint(); };
+    /* 10 secondes, pas 30 : le seuil de dépannage se compte en dizaines de
+       secondes, un battement plus lent ajouterait autant de retard qu'il y a
+       de seuil. Un redessin de cette carte ne coûte rien. */
     clearInterval(this._tick);
-    this._tick = setInterval(rafraichir, 30000);
+    this._tick = setInterval(rafraichir, 10000);
 
     /* La minuterie ne suffit pas : un navigateur ralentit, voire gèle, les
        pages laissées en arrière-plan — c'est la vie d'une tablette murale en
@@ -641,8 +646,8 @@ const EVC_SCHEMA = [
   ]},
 
   {name:'', type:'expandable', title:'Dépannage', schema:[
-    {name:'stuck_after',
-     selector:{number:{min:1, max:30, step:1, mode:'slider'}}},
+    {name:'stuck_delay',
+     selector:{number:{min:5, max:300, step:5, mode:'slider'}}},
     {name:'unstick_delay',
      selector:{number:{min:2, max:20, step:1, mode:'slider'}}}
   ]},
@@ -664,7 +669,7 @@ const EVC_LABELS = {
   battery:'Capteur de batterie', fault:'Capteur de panne',
   consumables:'Consommables suivis',
   size:'Taille du robot (px)', font_scale:'Taille du texte',
-  stuck_after:'Immobile depuis (min)',
+  stuck_delay:'Immobile depuis (s)',
   unstick_delay:'Délai avant la relance (s)',
   consumable_mode:'Afficher',
   alert_wear:'Seuil du point d\'alerte (%)',
@@ -674,9 +679,9 @@ const EVC_LABELS = {
 
 const EVC_HELPERS = {
   size:'C\'est elle qui fixe la hauteur de la carte.',
-  stuck_after:'Immobilité au-delà de laquelle le triangle apparaît. Sous '
-    + '2 minutes, il se déclenchera aussi sur des arrêts parfaitement '
-    + 'normaux, qui durent jusqu'à 2 min 22.',
+  stuck_delay:'Immobilité au-delà de laquelle le triangle apparaît. Sous '
+    + 'ne vaut que pour l\'état « à l\'arrêt » : le silence garde un '
+    + 'plancher de 45 s, sous lequel il se déclencherait en plein nettoyage.',
   unstick_delay:'Entre le retour à la base et la relance.',
   alert_wear:'Au-delà, un point rouge apparaît sur le chevron.'
 };

@@ -97,17 +97,23 @@ d'immobilité, celle où le robot annonce un état au lieu de se taire :
 
 **Deux mécanismes, deux seuils** — ils n'ont pas la même contrainte :
 
-Les deux chemins partagent le même seuil, **2 minutes** par défaut.
+| Chemin | Délai | Pourquoi |
+|---|---|---|
+| il **annonce** « à l'arrêt » | **5 s**, réglable | cet état n'apparaît pas tout seul pendant qu'il travaille |
+| il **se tait** (`task_state` vide) | 45 s, plancher | il se tait *aussi* en nettoyant, jusqu'à 40 s d'affilée |
 
-**Pourquoi pas plus court.** « À l'arrêt » n'est pas rare et n'est presque
-jamais un blocage : sur dix jours d'historique, **dix-sept** passages en
-`idle` se sont résolus seuls, de 23 secondes à 2 min 22, la moitié suivis
-d'un retour en nettoyage. À deux minutes, un seul d'entre eux déclencherait
-encore ; à deux secondes, les dix-sept. Et un faux triangle coûte cher :
-on appuie dessus, et il lance un nettoyage complet.
+Le second est le seul chiffre qu'on ne peut pas baisser. Le firmware alterne
+« clean » et rien du tout pendant une session normale ; sous 45 secondes, le
+triangle s'allumerait plusieurs fois par nettoyage.
 
-Côté silence, la borne est le clignotement de `task_state`, qui alterne
-toutes les 20 à 40 secondes en nettoyage normal.
+Selon la façon dont le robot se coince, on est donc prévenu en 5 ou en 45
+secondes — roue soulevée, il se tait ; accroché à un objet, il annonce
+souvent son arrêt.
+
+Le défaut de 5 s est délibérément agressif, pour une maison où les blocages
+sont fréquents (jouets par terre). À ajuster : l'historique montre des arrêts
+d'une trentaine de secondes qui se résolvent seuls, et un faux triangle coûte
+cher — on appuie dessus, et il relance un nettoyage complet.
 
 Le seuil réglable est celui du silence, parce que c'est lui qui attrape les
 blocages et qu'on le veut court : on va à la tablette *parce qu'on a vu* le
