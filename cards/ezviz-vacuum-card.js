@@ -96,7 +96,7 @@ class EzvizVacuumCard extends HTMLElement{
       name:null, battery:null, fault:null,
       consumables:[], consumable_mode:'wear', show_hours:true, alert_wear:85,
       font_scale:1, size:56,
-      stuck_delay:5, unstick_delay:5
+      stuck_delay:0, unstick_delay:5
     }, cfg);
 
     this._cons = (cfg.consumables || []).map(c =>
@@ -385,7 +385,7 @@ class EzvizVacuumCard extends HTMLElement{
           String(fs.state).toLowerCase())) return true;
     }
 
-    const seuil = evcNum(c.stuck_delay) || 5;   // en secondes
+    const seuil = evcNum(c.stuck_delay) || 0;   // en secondes
     const a = st.attributes || {};
 
     /* Un dépannage remet le compteur à zéro. Sans ça, le robot met jusqu'à
@@ -403,17 +403,18 @@ class EzvizVacuumCard extends HTMLElement{
     if(!a.in_charging && !a.task_state)
       return depuis(st.last_updated) >= Math.max(seuil, 45);
 
-    /* Arrêté et bavard : le robot annonce un état au lieu de se taire.
+    /* Arrêté et bavard : le robot annonce lui-même son arrêt.
 
-       C'est ce chemin que règle `stuck_delay`, et il peut descendre très
-       bas : contrairement au silence, « à l'arrêt » n'apparaît pas par
-       intermittence pendant une session.
+       Sans délai, et c'est délibéré. Mesuré : le robot soulevé, l'entité
+       passe à « à l'arrêt » en 13 à 15 secondes, au moment même où
+       l'application officielle notifie le blocage. L'attente est donc déjà
+       faite par l'appareil ; en rajouter une ici ne ferait que retarder.
 
-       Le défaut de 5 s est délibérément agressif, pour un usage avec un
-       bébé et des jouets par terre : les blocages y sont fréquents et
-       brefs, et mieux vaut un triangle de trop qu'un robot qui attend. À
-       ajuster à l'usage — l'historique montre des arrêts d'une trentaine de
-       secondes qui se résolvent seuls. */
+       Surtout, ça libère la détection de toute minuterie : le changement
+       d'état provoque un redessin de force, donc le triangle apparaît dans
+       le même souffle que le libellé. Un délai, lui, dépendrait de notre
+       `setInterval` — que le navigateur d'une tablette murale gèle
+       volontiers, et c'est exactement ce qui faisait manquer le triangle. */
     if(st.state === 'idle') return depuis(st.last_changed) >= seuil;
 
     return false;
@@ -647,7 +648,7 @@ const EVC_SCHEMA = [
 
   {name:'', type:'expandable', title:'Dépannage', schema:[
     {name:'stuck_delay',
-     selector:{number:{min:5, max:300, step:5, mode:'slider'}}},
+     selector:{number:{min:0, max:300, step:5, mode:'slider'}}},
     {name:'unstick_delay',
      selector:{number:{min:2, max:20, step:1, mode:'slider'}}}
   ]},

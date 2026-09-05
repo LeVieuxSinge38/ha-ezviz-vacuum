@@ -99,8 +99,18 @@ d'immobilité, celle où le robot annonce un état au lieu de se taire :
 
 | Chemin | Délai | Pourquoi |
 |---|---|---|
-| il **annonce** « à l'arrêt » | **5 s**, réglable | cet état n'apparaît pas tout seul pendant qu'il travaille |
+| il **annonce** « à l'arrêt » | **aucun** | l'attente est déjà faite par l'appareil |
 | il **se tait** (`task_state` vide) | 45 s, plancher | il se tait *aussi* en nettoyant, jusqu'à 40 s d'affilée |
+
+Mesuré : robot soulevé, l'entité passe à « à l'arrêt » en **13 à 15 secondes**,
+au moment même où l'application officielle notifie le blocage. Y ajouter un
+délai ne ferait que retarder.
+
+Et surtout, l'absence de délai libère la détection de toute minuterie : le
+changement d'état provoque un redessin de force, donc le triangle apparaît
+dans le même souffle que le libellé. Un délai, lui, dépendrait du
+`setInterval` de la carte — que le navigateur d'une tablette murale gèle
+volontiers. C'est exactement ce qui faisait manquer le triangle.
 
 Le second est le seul chiffre qu'on ne peut pas baisser. Le firmware alterne
 « clean » et rien du tout pendant une session normale ; sous 45 secondes, le
