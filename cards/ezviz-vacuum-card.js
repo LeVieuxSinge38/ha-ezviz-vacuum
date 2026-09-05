@@ -96,7 +96,7 @@ class EzvizVacuumCard extends HTMLElement{
       name:null, battery:null, fault:null,
       consumables:[], consumable_mode:'wear', show_hours:true, alert_wear:85,
       font_scale:1, size:56,
-      stuck_delay:0, unstick_delay:5
+      stuck_delay:0
     }, cfg);
 
     this._cons = (cfg.consumables || []).map(c =>
@@ -296,7 +296,7 @@ class EzvizVacuumCard extends HTMLElement{
           </div>
         </div>
         <div class="cmd">
-          <button class="ico fix" title="Débloquer : retour à la base, puis relance">
+          <button class="ico fix" title="Débloquer : relancer le nettoyage">
             <ha-icon icon="mdi:hazard-lights"></ha-icon></button>
           <button class="ico go" title="Démarrer">
             <ha-icon icon="mdi:play"></ha-icon></button>
@@ -420,28 +420,23 @@ class EzvizVacuumCard extends HTMLElement{
     return false;
   }
 
-  /* Retour à la base, puis relance.
+  /* Relancer un robot bloqué.
 
-     Une fois le robot dégagé à la main, la pause ne le repart pas : il faut
-     lui redonner un ordre de retour, qui solde la tâche en cours, avant de
-     pouvoir en lancer une nouvelle. Le bouton enchaîne les deux, avec le
-     délai qu'on laisserait en le faisant soi-même. */
-  async _unstick(){
+     Il suffit de « démarrer » : mesuré sur l'appareil, un robot coincé puis
+     dégagé repart directement, sans qu'on ait à le renvoyer d'abord à sa
+     base. Le détour par la base venait d'une supposition — la pause ne le
+     relançant pas, on avait cru qu'il fallait solder la tâche en cours.
+
+     Le bouton prend la place de « Démarrer », qui s'efface : c'est le même
+     geste, sur le même bouton, simplement signalé en rouge. */
+  _unstick(){
     if(!this._hass || this._fixing) return;
     this._fixing = true;
-    /* Le triangle s'efface au clic, pas à la fin de la manœuvre : un bouton
-       qui reste allumé cinq secondes après qu'on l'a pressé donne
-       l'impression de n'avoir rien fait. */
+    /* Le triangle s'efface au clic, pas à la fin de la manœuvre. */
     this._fixedAt = Date.now();
-    this._paint();
 
-    const cible = {entity_id:this._cfg.entity};
-    this._hass.callService('vacuum', 'return_to_base', {}, cible);
+    this._hass.callService('vacuum', 'start', {}, {entity_id:this._cfg.entity});
 
-    const attente = (evcNum(this._cfg.unstick_delay) || 5) * 1000;
-    await new Promise(r => setTimeout(r, attente));
-
-    this._hass.callService('vacuum', 'start', {}, cible);
     this._fixing = false;
     /* Le robot met une vingtaine de secondes à publier son nouvel état. */
     this._pending = 'cleaning';
@@ -605,7 +600,7 @@ class EzvizVacuumCard extends HTMLElement{
       el.classList.toggle('gone', !faisable);
       el.disabled = !faisable;
     };
-    commande(e.go,    !dead && state !== 'cleaning');
+    commande(e.go,    !dead && state !== 'cleaning' && !coince);
     commande(e.pause, !dead && (state === 'cleaning' || state === 'returning'));
     commande(e.home,  !dead && state !== 'docked' && state !== 'returning');
   }
@@ -649,8 +644,6 @@ const EVC_SCHEMA = [
   {name:'', type:'expandable', title:'Dépannage', schema:[
     {name:'stuck_delay',
      selector:{number:{min:0, max:300, step:5, mode:'slider'}}},
-    {name:'unstick_delay',
-     selector:{number:{min:2, max:20, step:1, mode:'slider'}}}
   ]},
 
   {name:'', type:'expandable', title:'Entretien', schema:[
@@ -671,7 +664,6 @@ const EVC_LABELS = {
   consumables:'Consommables suivis',
   size:'Taille du robot (px)', font_scale:'Taille du texte',
   stuck_delay:'Immobile depuis (s)',
-  unstick_delay:'Délai avant la relance (s)',
   consumable_mode:'Afficher',
   alert_wear:'Seuil du point d\'alerte (%)',
   show_hours:'Afficher les heures restantes',
@@ -683,7 +675,6 @@ const EVC_HELPERS = {
   stuck_delay:'Immobilité au-delà de laquelle le triangle apparaît. Sous '
     + 'ne vaut que pour l\'état « à l\'arrêt » : le silence garde un '
     + 'plancher de 45 s, sous lequel il se déclencherait en plein nettoyage.',
-  unstick_delay:'Entre le retour à la base et la relance.',
   alert_wear:'Au-delà, un point rouge apparaît sur le chevron.'
 };
 
