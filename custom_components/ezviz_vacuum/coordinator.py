@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from time import monotonic
 from typing import Any
 
 from homeassistant.config_entries import ConfigEntry
@@ -12,7 +13,7 @@ from homeassistant.helpers.event import async_call_later
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
 from .api import EzvizVacuumApi
-from .const import DOMAIN, SLOW_EVERY, UPDATE_INTERVAL
+from .const import DOMAIN, SLOW_EVERY, UPDATE_INTERVAL, UPDATE_INTERVAL_ACTIF
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -36,7 +37,8 @@ class EzvizVacuumCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
         )
         self.api = api
         self.devices = devices
-        self._cycle = 0
+        #: Date du dernier relevé lent, pour l'espacer dans le temps.
+        self._slow_at = 0.0
         self._slow: dict[str, dict[str, Any]] = {}
         #: Armé après une écriture qui touche les données lentes, pour ne pas
         #: attendre le prochain cycle long avant de les relire.
@@ -44,14 +46,38 @@ class EzvizVacuumCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
 
     async def _async_update_data(self) -> dict[str, dict[str, Any]]:
         try:
-            return await self.hass.async_add_executor_job(self._fetch)
+            data = await self.hass.async_add_executor_job(self._fetch)
         except Exception as err:  # noqa: BLE001 - la lib lève large
             raise UpdateFailed(f"Relevé EZVIZ impossible : {err}") from err
+        self._ajuster_cadence(data)
+        return data
+
+    def _ajuster_cadence(self, data: dict[str, dict[str, Any]]) -> None:
+        """Relève vite quand le robot travaille, lentement quand il charge.
+
+        Un robot arrimé ne réserve aucune surprise : le suivre de près ne
+        ferait qu'user le quota d'appels. Hors de sa base, en revanche, la
+        moindre seconde de retard se voit — c'est là qu'il se coince.
+        """
+        arrime = all(
+            bool((appareil.get("task") or {}).get("inCharging"))
+            for appareil in data.values()
+        ) if data else True
+
+        voulue = UPDATE_INTERVAL if arrime else UPDATE_INTERVAL_ACTIF
+        if self.update_interval != voulue:
+            _LOGGER.debug("Cadence du relevé : %s", voulue)
+            self.update_interval = voulue
 
     def _fetch(self) -> dict[str, dict[str, Any]]:
-        refresh_slow = self._force_slow or self._cycle % SLOW_EVERY == 0
+        maintenant = monotonic()
+        refresh_slow = (
+            self._force_slow
+            or maintenant - self._slow_at >= SLOW_EVERY.total_seconds()
+        )
         self._force_slow = False
-        self._cycle += 1
+        if refresh_slow:
+            self._slow_at = maintenant
 
         result: dict[str, dict[str, Any]] = {}
         for serial in self.devices:

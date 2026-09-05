@@ -27,9 +27,22 @@ DEVICE_CATEGORY: Final = "SweepingRobot"
 RESOURCE: Final = "SweepingRobot"
 LOCAL_INDEX: Final = "0"
 
-UPDATE_INTERVAL: Final = timedelta(seconds=30)
-#: Les consommables et les cartes bougent lentement : un relevé sur dix suffit.
-SLOW_EVERY: Final = 10
+#: Cadence du relevé, adaptée à ce que fait le robot.
+#:
+#: Mesuré : le robot soulevé publie « standby » dans les secondes qui
+#: suivent — l'application officielle alerte en 4 s — mais on ne l'apprenait
+#: qu'au relevé suivant, soit jusqu'à 30 secondes plus tard. Tout le retard
+#: venait de là.
+#:
+#: Arrimé, il ne fait rien pendant des heures : inutile de harceler l'API
+#: d'EZVIZ pour l'apprendre.
+UPDATE_INTERVAL: Final = timedelta(seconds=30)      # sur sa base
+UPDATE_INTERVAL_ACTIF: Final = timedelta(seconds=10)  # partout ailleurs
+#: Les consommables et les cartes bougent lentement : toutes les cinq
+#: minutes suffisent. Compté en temps, et non en nombre de cycles : la
+#: cadence du relevé varie, un compteur de cycles les relirait trois fois
+#: plus souvent dès que le robot se met en route.
+SLOW_EVERY: Final = timedelta(minutes=5)
 
 # --- Lecture -----------------------------------------------------------
 DOMAIN_TASK: Final = "SweeperTaskMgr"

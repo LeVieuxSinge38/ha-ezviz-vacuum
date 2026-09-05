@@ -106,9 +106,20 @@ d'immobilité, celle où le robot annonce un état au lieu de se taire :
 | il **annonce** « à l'arrêt » | **aucun** | l'attente est déjà faite par l'appareil |
 | il **se tait** (`task_state` vide) | 45 s, plancher | il se tait *aussi* en nettoyant, jusqu'à 40 s d'affilée |
 
-Mesuré : robot soulevé, l'entité passe à « à l'arrêt » en **13 à 15 secondes**,
-au moment même où l'application officielle notifie le blocage. Y ajouter un
-délai ne ferait que retarder.
+**Le retard vient du relevé, pas du robot.** Mesuré sur un blocage réel :
+
+```
+18:29:37   cleaning   task_state « »          il se tait
+18:30:08   idle       task_state « standby »  il annonce son arrêt
+```
+
+Trente secondes et demie entre les deux : exactement un cycle de relevé. Le
+robot avait publié un état franc — l'application officielle alerte en 4
+secondes — mais on ne l'apprenait qu'au tour suivant.
+
+D'où une cadence adaptative : **10 secondes hors de la base, 30 sur la base**.
+Un robot arrimé ne réserve aucune surprise, et le quota d'appels d'EZVIZ n'est
+pas illimité.
 
 Et surtout, l'absence de délai libère la détection de toute minuterie : le
 changement d'état provoque un redessin de force, donc le triangle apparaît
