@@ -9,7 +9,10 @@ batterie et usure des consommables. Développée et validée sur un
 return to dock, **suction power**, **water level**, battery and consumable
 wear. Built and tested on an EZVIZ RE5 Plus.*
 
-Avec une carte Lovelace assortie.
+![La carte EZVIZ dans Home Assistant](docs/carte.png)
+
+Avec une carte Lovelace assortie : compacte, coins arrondis, photos du robot
+embarquées dans le fichier — rien à configurer.
 
 L'intégration officielle `ezviz` ne gère que les caméras, sonnettes, ampoules
 et prises : les robots ne correspondent à aucune de ses catégories d'appareil.
@@ -42,6 +45,14 @@ l'usure des cinq consommables (serpillère, filtre HEPA, brosses, capteurs).
 
 La puissance d'aspiration est exposée en **lecture seule** (capteur
 « Aspiration »), et les cartes et pièces du robot en attributs de l'entité.
+
+### Les états de la carte
+
+![Les quatre états de la carte](docs/etats.png)
+
+Seules les commandes utiles ici et maintenant sont affichées : « Démarrer »
+disparaît en nettoyage, « Pause » et « Retour à la base » quand il est
+arrimé. Le triangle rouge, lui, n'apparaît que si le robot s'immobilise.
 
 ## Le bouton de dépannage
 
