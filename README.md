@@ -56,15 +56,35 @@ ni l'état `error` ne servent à rien ici : sur dix jours d'historique, le
 capteur de panne n'a jamais quitté « ok », y compris pendant des blocages
 avérés. Ce firmware ne remonte pas les incidents physiques.
 
-Ce qui se voit, c'est l'immobilité. Coincé, le robot tombe en `idle` — ni sur
-sa base, ni en train de nettoyer — et il y reste :
+**Ce qui se voit, mesuré en direct sur un robot volontairement coincé : il
+se tait.** `task_state` passe à vide et n'en bouge plus. L'état de l'entité,
+lui, reste « en nettoyage » — l'intégration conserve l'activité précédente
+quand `task_state` se vide, pour absorber le clignotement connu, si bien
+qu'elle ne basculera jamais d'elle-même.
+
+```
+état       : cleaning     <- inchangé, et le restera
+task_state : ""           <- le robot s'est tu
+last_updated : figé depuis  <- l'instant du silence
+```
+
+On mesure donc le silence : hors de sa base, `task_state` vide depuis assez
+longtemps. `last_updated` date le dernier changement d'attribut, donc
+l'instant exact où il s'est tu.
+
+Le clignotement ne peut pas déclencher : `task_state` alterne toutes les 20
+à 40 secondes pendant un nettoyage normal, et chaque alternance remet ce
+compteur à zéro. Seul un silence prolongé le laisse monter.
+
+L'`idle` prolongé reste surveillé en parallèle — c'est l'autre forme
+d'immobilité, celle où le robot annonce un état au lieu de se taire :
 
 | `idle` observés | Durée |
 |---|---|
 | entre deux sessions, normal | 30 s à 3 min |
 | blocages réels | 22 min, 31 min, 2 h 51 |
 
-Le seuil par défaut est donc de **5 minutes**, dans le creux entre les deux.
+Le seuil par défaut est de **5 minutes**, dans le creux entre les deux.
 Réglable, comme le délai entre les deux commandes.
 
 ⚠️ Un robot immobilisé ne publie plus rien : sans changement d'état, Home

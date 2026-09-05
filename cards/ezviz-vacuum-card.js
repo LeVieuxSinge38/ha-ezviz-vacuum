@@ -360,11 +360,20 @@ class EzvizVacuumCard extends HTMLElement{
      compris pendant des blocages avérés. On les surveille quand même, au cas
      où un autre modèle serait plus bavard.
 
-     Ce qui se voit, en revanche, c'est l'immobilité : coincé, le robot tombe
-     en `idle` — ni sur sa base, ni en train de nettoyer — et il y reste. Les
-     `idle` normaux, avant ou après une session, durent de 30 secondes à
-     3 minutes ; les blocages observés, de 22 minutes à près de 3 heures. Le
-     seuil de 5 minutes tombe dans un creux franc. */
+     Le vrai signal, mesuré en direct sur un robot coincé : **il se tait**.
+     `task_state` passe à vide et n'en bouge plus. L'état de l'entité, lui,
+     reste « en nettoyage » — l'intégration a un garde anti-clignotement qui
+     conserve l'activité précédente quand `task_state` se vide, si bien que
+     l'entité ne basculera jamais d'elle-même.
+
+     On mesure donc le silence : hors de sa base, `task_state` vide depuis
+     assez longtemps. `last_updated` date le dernier changement d'attribut,
+     donc l'instant où il s'est tu. Le clignotement connu de `task_state` —
+     il alterne toutes les 20 à 40 secondes pendant un nettoyage normal — ne
+     peut pas déclencher : chaque alternance remet ce compteur à zéro.
+
+     L'`idle` prolongé reste surveillé : c'est l'autre forme d'immobilité,
+     celle où le robot annonce un état au lieu de se taire. */
   _stuck(){
     const c = this._cfg, h = this._hass;
     if(!h || this._pending || this._fixing) return false;
@@ -377,10 +386,19 @@ class EzvizVacuumCard extends HTMLElement{
       if(fs && fs.state && !['ok','unknown','unavailable',''].includes(
           String(fs.state).toLowerCase())) return true;
     }
-    if(st.state !== 'idle') return false;
 
-    const minutes = (Date.now() - new Date(st.last_changed).getTime()) / 60000;
-    return minutes >= (evcNum(c.stuck_after) || 5);
+    const seuil = evcNum(c.stuck_after) || 5;
+    const a = st.attributes || {};
+
+    /* Muet et hors de sa base. */
+    if(!a.in_charging && !a.task_state)
+      return (Date.now() - new Date(st.last_updated).getTime()) / 60000 >= seuil;
+
+    /* Arrêté et bavard. */
+    if(st.state === 'idle')
+      return (Date.now() - new Date(st.last_changed).getTime()) / 60000 >= seuil;
+
+    return false;
   }
 
   /* Retour à la base, puis relance.
