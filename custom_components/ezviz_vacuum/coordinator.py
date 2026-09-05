@@ -7,7 +7,8 @@ import logging
 from typing import Any
 
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, callback
+from homeassistant.helpers.event import async_call_later
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
 from .api import EzvizVacuumApi
@@ -75,3 +76,17 @@ class EzvizVacuumCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
             # Le cloud met un instant à publier la nouvelle valeur.
             await asyncio.sleep(2)
         await self.async_request_refresh()
+
+        # Le robot met une dizaine de secondes à se mettre en mouvement : le
+        # relevé qui suit immédiatement la commande le montre encore inchangé.
+        # On repasse donc le voir, pour que TOUS les écrans apprennent qu'il
+        # est reparti sans attendre le cycle suivant — c'est ce qui laissait
+        # un triangle de dépannage allumé sur une tablette murale après un
+        # dépannage lancé depuis un téléphone.
+        for delai in (8, 20):
+            async_call_later(self.hass, delai, self._relire)
+
+    @callback
+    def _relire(self, _maintenant) -> None:
+        """Relance un relevé, sans attendre son résultat."""
+        self.hass.async_create_task(self.async_request_refresh())

@@ -461,13 +461,23 @@ class EzvizVacuumCard extends HTMLElement{
      n'apparaîtrait donc jamais. On se redessine donc de nous-mêmes, une fois
      par demi-minute, uniquement pour regarder l'heure. */
   connectedCallback(){
+    const rafraichir = () => { if(this._built && this._hass) this._paint(); };
     clearInterval(this._tick);
-    this._tick = setInterval(
-      () => { if(this._built && this._hass) this._paint(); }, 30000);
+    this._tick = setInterval(rafraichir, 30000);
+
+    /* La minuterie ne suffit pas : un navigateur ralentit, voire gèle, les
+       pages laissées en arrière-plan — c'est la vie d'une tablette murale en
+       veille. Elle se réveillerait donc avec un calcul vieux de plusieurs
+       minutes. On recalcule dès qu'elle redevient visible. */
+    this._reveil = rafraichir;
+    document.addEventListener('visibilitychange', this._reveil);
+    window.addEventListener('focus', this._reveil);
   }
   disconnectedCallback(){
     clearInterval(this._tick);
     this._tick = null;
+    document.removeEventListener('visibilitychange', this._reveil);
+    window.removeEventListener('focus', this._reveil);
   }
 
   set hass(h){
@@ -493,9 +503,15 @@ class EzvizVacuumCard extends HTMLElement{
     const photo = state === 'docked' ? EVC_PHOTO_DOCKED : EVC_PHOTO_MOVING;
     if(e.img.getAttribute('src') !== photo) e.img.setAttribute('src', photo);
 
-    e.main.classList.toggle('busy', info.busy);
+    /* Coincé, le robot continue d'annoncer « en nettoyage » : c'est le
+       propre de la panne, il ne sait pas qu'il ne va nulle part. La carte,
+       elle, ne peut pas afficher le triangle d'alerte à côté d'un point vert
+       et d'un balayage qui tourne — elle se contredirait. */
+    const coince = this._stuck();
 
-    /* Une panne remplace l'état : c'est l'information qui prime. */
+    e.main.classList.toggle('busy', info.busy && !coince);
+
+    /* Une panne nommée prime sur tout : c'est l'information la plus utile. */
     let fault = '';
     if(c.fault){
       const fs = this._hass.states[c.fault];
@@ -503,9 +519,10 @@ class EzvizVacuumCard extends HTMLElement{
           String(fs.state).toLowerCase()))
         fault = EVC_FAULTS[fs.state] || fs.state;
     }
-    if(fault) e.card.style.setProperty('--vc', EVC_LOW);
-    e.lbl.textContent = fault || info.t;
-    e.st.classList.toggle('err', !!fault);
+    const alerte = fault || (coince ? 'Bloqué' : '');
+    if(alerte) e.card.style.setProperty('--vc', EVC_LOW);
+    e.lbl.textContent = alerte || info.t;
+    e.st.classList.toggle('err', !!alerte);
 
     /* ---- batterie, sur la même ligne que l'état ---- */
     let pct = NaN;
@@ -564,7 +581,7 @@ class EzvizVacuumCard extends HTMLElement{
        Le second argument de classList.toggle doit être un vrai booléen : un
        `undefined` n'est pas « faux », il fait basculer la classe au lieu de
        la retirer, et le bouton s'allumerait un redessin sur deux. */
-    e.fix.classList.toggle('show', this._stuck());
+    e.fix.classList.toggle('show', coince);
     e.fix.disabled = !!this._fixing;
 
     /* ---- commandes ----

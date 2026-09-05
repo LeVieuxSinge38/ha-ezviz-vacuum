@@ -108,9 +108,24 @@ robot coincé, le bouton doit déjà être là. Ne pas descendre sous 2 minutes,
 sous peine de voir le triangle clignoter en plein nettoyage normal — et un
 voyant qui crie au loup finit par ne plus être vu.
 
-⚠️ Un robot immobilisé ne publie plus rien : sans changement d'état, Home
-Assistant ne réveille jamais la carte. Elle se redessine donc d'elle-même
-toutes les 30 secondes, uniquement pour regarder l'heure.
+Quand le triangle s'allume, la carte passe **en entier** en alerte : le
+libellé devient « Bloqué » en rouge et les animations s'arrêtent. Le robot,
+lui, continue d'annoncer « en nettoyage » — c'est le propre de la panne, il
+ne sait pas qu'il ne va nulle part — mais la carte ne peut pas afficher un
+triangle d'alerte à côté d'un point vert sans se contredire.
+
+⚠️ **Un robot immobilisé ne publie plus rien**, donc aucun changement d'état
+ne réveille la carte. Elle se redessine toutes les 30 secondes pour regarder
+l'heure, **et dès qu'elle redevient visible** : un navigateur ralentit ou gèle
+les pages laissées en arrière-plan, ce qui est la vie d'une tablette murale
+en veille — sans ça, elle se réveillerait avec un calcul vieux de plusieurs
+minutes.
+
+**Sur plusieurs écrans.** Le « je viens de dépanner » est mémorisé dans le
+navigateur qui a cliqué : c'est ce qui efface le triangle instantanément.
+Les autres écrans, eux, ne peuvent se fier qu'à Home Assistant, et attendent
+que le robot recommence à parler. L'intégration relit donc l'appareil 8 et
+20 secondes après chaque commande, au lieu d'attendre le relevé suivant.
 
 ## Ce que cette intégration ne peut pas faire
 
