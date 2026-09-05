@@ -403,11 +403,16 @@ class EzvizVacuumCard extends HTMLElement{
        clignoter le triangle alors que tout va bien. */
     if(!a.in_charging && !a.task_state) return depuis(st.last_updated) >= seuil;
 
-    /* Arrêté et bavard. Autre mécanisme, autre contrainte : entre deux
-       sessions, un `idle` parfaitement normal dure jusqu'à 3 minutes. Ce
-       seuil-là ne peut donc pas descendre aussi bas que l'autre, et il ne
-       suit pas le réglage. */
-    if(st.state === 'idle') return depuis(st.last_changed) >= Math.max(seuil, 5);
+    /* Arrêté et bavard : le robot annonce un état au lieu de se taire.
+
+       Ce chemin ne peut pas descendre aussi bas que l'autre : entre deux
+       sessions, un `idle` parfaitement normal dure jusqu'à 2 min 22 dans
+       l'historique observé. Le plancher est donc à 3 minutes, juste
+       au-dessus du bruit — et pas plus haut, sinon on attend pour rien.
+
+       Il ne s'agit pas d'être prudent par principe : un faux triangle
+       coûte cher, puisqu'on appuie dessus et qu'il lance un nettoyage. */
+    if(st.state === 'idle') return depuis(st.last_changed) >= Math.max(seuil, 3);
 
     return false;
   }

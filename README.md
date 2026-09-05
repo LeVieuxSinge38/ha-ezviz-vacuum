@@ -99,8 +99,12 @@ d'immobilité, celle où le robot annonce un état au lieu de se taire :
 
 | Mécanisme | Ce qui le borne | Seuil |
 |---|---|---|
-| silence (les vrais blocages) | le clignotement de `task_state`, 20 à 40 s | **2 min**, réglable |
-| `idle` prolongé | un arrêt normal entre deux sessions, jusqu'à 3 min | 5 min, fixe |
+| silence — le robot se tait | le clignotement de `task_state`, 20 à 40 s | **2 min**, réglable |
+| `idle` — le robot annonce un état | un arrêt normal entre deux sessions, jusqu'à 2 min 22 | 3 min minimum |
+
+Le second ne descend pas plus bas, et ce n'est pas de la prudence de
+principe : un faux triangle coûte cher, puisqu'on appuie dessus et qu'il
+lance un nettoyage complet.
 
 Le seuil réglable est celui du silence, parce que c'est lui qui attrape les
 blocages et qu'on le veut court : on va à la tablette *parce qu'on a vu* le
@@ -126,6 +130,13 @@ navigateur qui a cliqué : c'est ce qui efface le triangle instantanément.
 Les autres écrans, eux, ne peuvent se fier qu'à Home Assistant, et attendent
 que le robot recommence à parler. L'intégration relit donc l'appareil 8 et
 20 secondes après chaque commande, au lieu d'attendre le relevé suivant.
+
+⚠️ **Une carte personnalisée n'est chargée qu'une fois, au chargement de la
+page** — Home Assistant ne la recharge jamais à chaud. Un écran resté ouvert
+continue donc d'exécuter la version qu'il avait en mémoire, quoi qu'on
+publie. C'est la cause la plus fréquente d'un « ça ne se synchronise pas »
+entre un téléphone, qui recharge la page à chaque ouverture, et une tablette
+murale qui ne la recharge jamais.
 
 ## Ce que cette intégration ne peut pas faire
 
