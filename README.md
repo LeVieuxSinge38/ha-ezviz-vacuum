@@ -97,14 +97,17 @@ d'immobilité, celle où le robot annonce un état au lieu de se taire :
 
 **Deux mécanismes, deux seuils** — ils n'ont pas la même contrainte :
 
-| Mécanisme | Ce qui le borne | Seuil |
-|---|---|---|
-| silence — le robot se tait | le clignotement de `task_state`, 20 à 40 s | **2 min**, réglable |
-| `idle` — le robot annonce un état | un arrêt normal entre deux sessions, jusqu'à 2 min 22 | 3 min minimum |
+Les deux chemins partagent le même seuil, **2 minutes** par défaut.
 
-Le second ne descend pas plus bas, et ce n'est pas de la prudence de
-principe : un faux triangle coûte cher, puisqu'on appuie dessus et qu'il
-lance un nettoyage complet.
+**Pourquoi pas plus court.** « À l'arrêt » n'est pas rare et n'est presque
+jamais un blocage : sur dix jours d'historique, **dix-sept** passages en
+`idle` se sont résolus seuls, de 23 secondes à 2 min 22, la moitié suivis
+d'un retour en nettoyage. À deux minutes, un seul d'entre eux déclencherait
+encore ; à deux secondes, les dix-sept. Et un faux triangle coûte cher :
+on appuie dessus, et il lance un nettoyage complet.
+
+Côté silence, la borne est le clignotement de `task_state`, qui alterne
+toutes les 20 à 40 secondes en nettoyage normal.
 
 Le seuil réglable est celui du silence, parce que c'est lui qui attrape les
 blocages et qu'on le veut court : on va à la tablette *parce qu'on a vu* le

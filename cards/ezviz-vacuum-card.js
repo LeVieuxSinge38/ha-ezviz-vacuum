@@ -404,15 +404,15 @@ class EzvizVacuumCard extends HTMLElement{
     if(!a.in_charging && !a.task_state) return depuis(st.last_updated) >= seuil;
 
     /* Arrêté et bavard : le robot annonce un état au lieu de se taire.
+       Même seuil que le silence — un seul réglage, un seul comportement.
 
-       Ce chemin ne peut pas descendre aussi bas que l'autre : entre deux
-       sessions, un `idle` parfaitement normal dure jusqu'à 2 min 22 dans
-       l'historique observé. Le plancher est donc à 3 minutes, juste
-       au-dessus du bruit — et pas plus haut, sinon on attend pour rien.
-
-       Il ne s'agit pas d'être prudent par principe : un faux triangle
-       coûte cher, puisqu'on appuie dessus et qu'il lance un nettoyage. */
-    if(st.state === 'idle') return depuis(st.last_changed) >= Math.max(seuil, 3);
+       Ne pas le descendre par réflexe : « à l'arrêt » n'est pas rare et
+       n'est presque jamais un blocage. Sur dix jours d'historique, dix-sept
+       passages en `idle` se sont résolus seuls, de 23 secondes à 2 min 22,
+       la moitié suivis d'un retour en nettoyage. À deux minutes, un seul
+       d'entre eux déclencherait encore ; à deux secondes, les dix-sept —
+       et chacun invite à appuyer sur un bouton qui relance une session. */
+    if(st.state === 'idle') return depuis(st.last_changed) >= seuil;
 
     return false;
   }
@@ -642,7 +642,7 @@ const EVC_SCHEMA = [
 
   {name:'', type:'expandable', title:'Dépannage', schema:[
     {name:'stuck_after',
-     selector:{number:{min:2, max:30, step:1, mode:'slider'}}},
+     selector:{number:{min:1, max:30, step:1, mode:'slider'}}},
     {name:'unstick_delay',
      selector:{number:{min:2, max:20, step:1, mode:'slider'}}}
   ]},
@@ -674,9 +674,9 @@ const EVC_LABELS = {
 
 const EVC_HELPERS = {
   size:'C\'est elle qui fixe la hauteur de la carte.',
-  stuck_after:'Silence du robot au-delà duquel le triangle apparaît. Ne pas '
-    + 'descendre sous 2 minutes : task_state clignote toutes les 20 à '
-    + '40 secondes en nettoyage normal.',
+  stuck_after:'Immobilité au-delà de laquelle le triangle apparaît. Sous '
+    + '2 minutes, il se déclenchera aussi sur des arrêts parfaitement '
+    + 'normaux, qui durent jusqu'à 2 min 22.',
   unstick_delay:'Entre le retour à la base et la relance.',
   alert_wear:'Au-delà, un point rouge apparaît sur le chevron.'
 };
