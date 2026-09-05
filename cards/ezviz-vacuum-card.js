@@ -230,9 +230,6 @@ class EzvizVacuumCard extends HTMLElement{
     .fix:hover:not(:disabled){
       background:color-mix(in srgb, #ff453a 28%, transparent)}
     @keyframes evc-blink{50%{opacity:.35}}
-    /* Pendant la manœuvre, il cesse de clignoter : le geste est en cours,
-       il n'y a plus rien à signaler. */
-    .fix.busy{animation:none;opacity:.55}
 
     /* Le chevron n'est pas une commande : plus petit, sans fond. */
     .chev{
@@ -390,13 +387,19 @@ class EzvizVacuumCard extends HTMLElement{
     const seuil = evcNum(c.stuck_after) || 5;
     const a = st.attributes || {};
 
+    /* Un dépannage remet le compteur à zéro. Sans ça, le robot met jusqu'à
+       une minute à se remettre à parler — le temps du relevé suivant — et
+       l'horodatage d'origine, lui, est toujours vieux de dix minutes : le
+       triangle réapparaîtrait aussitôt après avoir été pressé. */
+    const depuis = (horodatage) =>
+      (Date.now() - Math.max(new Date(horodatage).getTime(),
+                             this._fixedAt || 0)) / 60000;
+
     /* Muet et hors de sa base. */
-    if(!a.in_charging && !a.task_state)
-      return (Date.now() - new Date(st.last_updated).getTime()) / 60000 >= seuil;
+    if(!a.in_charging && !a.task_state) return depuis(st.last_updated) >= seuil;
 
     /* Arrêté et bavard. */
-    if(st.state === 'idle')
-      return (Date.now() - new Date(st.last_changed).getTime()) / 60000 >= seuil;
+    if(st.state === 'idle') return depuis(st.last_changed) >= seuil;
 
     return false;
   }
@@ -410,6 +413,10 @@ class EzvizVacuumCard extends HTMLElement{
   async _unstick(){
     if(!this._hass || this._fixing) return;
     this._fixing = true;
+    /* Le triangle s'efface au clic, pas à la fin de la manœuvre : un bouton
+       qui reste allumé cinq secondes après qu'on l'a pressé donne
+       l'impression de n'avoir rien fait. */
+    this._fixedAt = Date.now();
     this._paint();
 
     const cible = {entity_id:this._cfg.entity};
@@ -549,8 +556,7 @@ class EzvizVacuumCard extends HTMLElement{
        Le second argument de classList.toggle doit être un vrai booléen : un
        `undefined` n'est pas « faux », il fait basculer la classe au lieu de
        la retirer, et le bouton s'allumerait un redessin sur deux. */
-    e.fix.classList.toggle('show', !!(this._stuck() || this._fixing));
-    e.fix.classList.toggle('busy', !!this._fixing);
+    e.fix.classList.toggle('show', this._stuck());
     e.fix.disabled = !!this._fixing;
 
     /* ---- commandes ---- */
