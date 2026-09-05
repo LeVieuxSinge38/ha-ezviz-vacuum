@@ -60,6 +60,11 @@ STATE_INSPECT_PAUSE: Final = "inspectPause"
 STATE_INSPECT_DONE_RECHARGE: Final = "inspectDoneRecharge"
 STATE_CONTINUE_CHARGING: Final = "continueCharging"
 
+#: Un robot coincé cesse de publier son `taskState`. Mais il se tait aussi
+#: par intermittence pendant un nettoyage normal — jusqu'à 40 secondes
+#: d'affilée. Au-delà, le silence n'est plus un clignotement : il est bloqué.
+SILENCE_BLOQUE: Final = timedelta(seconds=45)
+
 RETURNING_STATES: Final = {
     STATE_CLEAN_DONE_RECHARGE,
     STATE_INSPECT_DONE_RECHARGE,

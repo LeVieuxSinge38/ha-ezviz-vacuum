@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from datetime import datetime
 from typing import Any
 
 from homeassistant.components.vacuum import (
@@ -13,12 +14,14 @@ from homeassistant.components.vacuum import (
 
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
+from homeassistant.util import dt as dt_util
 
 from . import EzvizVacuumConfigEntry
 from .const import (
     CLEANING_STATES,
     PAUSED_STATES,
     RETURNING_STATES,
+    SILENCE_BLOQUE,
     STATE_DRYING_MOP,
 )
 from .entity import EzvizVacuumBaseEntity
@@ -68,6 +71,10 @@ class EzvizVacuum(EzvizVacuumBaseEntity, StateVacuumEntity):
         #: `taskState` retombe brièvement à vide pendant un nettoyage continu.
         #: On mémorise la dernière activité franche pour ne pas clignoter.
         self._last_activity: VacuumActivity | None = None
+        #: Depuis quand le robot se tait. C'est ici que la durée du silence
+        #: se mesure, et pas dans une carte : l'horloge de Home Assistant ne
+        #: se fait pas geler, celle d'un navigateur de tablette murale si.
+        self._silence_depuis: datetime | None = None
 
     # ------------------------------------------------------------------
     # État
@@ -84,6 +91,13 @@ class EzvizVacuum(EzvizVacuumBaseEntity, StateVacuumEntity):
         state = task.get("taskState") or ""
         charging = bool(task.get("inCharging"))
 
+        # Le robot parle : on repart de zéro. Il se tait : on date le début
+        # du silence, pour savoir plus bas s'il dure trop.
+        if state:
+            self._silence_depuis = None
+        elif self._silence_depuis is None:
+            self._silence_depuis = dt_util.utcnow()
+
         if state in CLEANING_STATES:
             self._last_activity = VacuumActivity.CLEANING
         elif state in PAUSED_STATES:
@@ -94,13 +108,21 @@ class EzvizVacuum(EzvizVacuumBaseEntity, StateVacuumEntity):
             self._last_activity = VacuumActivity.DOCKED
         elif state:
             self._last_activity = VacuumActivity.IDLE
-        elif self._last_activity in (
-            VacuumActivity.CLEANING,
-            VacuumActivity.PAUSED,
-            VacuumActivity.RETURNING,
+        elif (
+            self._last_activity
+            in (
+                VacuumActivity.CLEANING,
+                VacuumActivity.PAUSED,
+                VacuumActivity.RETURNING,
+            )
+            and dt_util.utcnow() - self._silence_depuis < SILENCE_BLOQUE
         ):
             # État vide alors que le robot est hors base : c'est le
             # clignotement connu de taskState, on garde l'activité précédente.
+            #
+            # Mais pas indéfiniment. Un robot coincé se tait pour de bon, et
+            # sans cette borne l'entité restait « en nettoyage » des heures
+            # durant — mesuré : roue soulevée, elle ne bascule jamais.
             pass
         else:
             self._last_activity = VacuumActivity.IDLE
