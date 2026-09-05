@@ -18,9 +18,18 @@ porte sur le meme objet, et sa sortie renvoie la configuration complete -
 elle fait sans doute republier sa config a l'appareil. D'ou la combinaison :
 ecrire la propriete, puis pousser l'action pour forcer la relecture.
 
-LE JUGE : l'appareil republie son etat toutes les ~4 s. Si la valeur ecrite
-tient encore 15 s plus tard, c'est qu'il l'a adoptee. Si elle est revenue a
-l'ancienne, c'est lui qui a ecrase le cache - et la, c'est plie.
+⚠️ CE SCRIPT A CONCLU A TORT. Il est garde parce que son resultat compte,
+mais son critere etait faux : il tenait pour acquis que l'appareil republie
+StdCleanCfg toutes les ~4 s, donc qu'une valeur qui tient 15 s a ete adoptee.
+L'appareil ne republie PAS cet objet. Rien ne corrige jamais le cache : une
+valeur fantaisiste y reste des heures, et l'application EZVIZ, qui lit ce
+meme cache, l'affiche aussi.
+
+Le vrai juge est le robot : il emet un bip a chaque reglage recu, et
+l'aspiration s'entend. Aucun bip n'a jamais suivi ces ecritures.
+
+Ce que le script etablit donc reellement : l'ecriture atteint le cache du
+cloud et y persiste. Rien de plus.
 
 Le robot ne se deplace a aucun moment.
 

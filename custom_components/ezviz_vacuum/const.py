@@ -76,19 +76,6 @@ FAN_SPEEDS: Final = {
     "super": "Maximum",
 }
 
-#: `waterQuantity` -> libellé. Les quatre crans de l'application.
-WATER_LEVELS: Final = {
-    "dry": "Serpillère sèche",
-    "low": "Faible",
-    "middle": "Moyen",
-    "high": "Maximum",
-}
-
-#: `cleanTimes` -> libellé. Le robot accepte aussi 0, qu'il traite comme un
-#: passage unique ; on l'affiche comme tel sans proposer de l'écrire.
-CLEAN_TIMES: Final = {1: "Une fois", 2: "Deux fois"}
-CLEAN_TIMES_DEFAULT: Final = 1
-
 #: Ordre de nettoyage : -1 exclut la pièce de la tâche.
 ORDER_EXCLUDED: Final = -1
 #: `cleanConfigType` : toute la surface, ou sélection par pièce.

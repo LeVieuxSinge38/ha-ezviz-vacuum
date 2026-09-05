@@ -16,7 +16,7 @@ from .coordinator import EzvizVacuumCoordinator
 
 _LOGGER = logging.getLogger(__name__)
 
-PLATFORMS: list[Platform] = [Platform.SELECT, Platform.SENSOR, Platform.VACUUM]
+PLATFORMS: list[Platform] = [Platform.SENSOR, Platform.VACUUM]
 
 EzvizVacuumConfigEntry = ConfigEntry[EzvizVacuumCoordinator]
 

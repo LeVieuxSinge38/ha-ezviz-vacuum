@@ -7,7 +7,6 @@ exécutés dans un thread par le coordinateur.
 from __future__ import annotations
 
 import logging
-from copy import deepcopy
 from typing import Any
 
 from pyezvizapi import EzvizClient
@@ -133,57 +132,6 @@ class EzvizVacuumApi:
             )
         elif device_meta.get("errorMsg") != "success":
             raise RuntimeError(f"Le robot a refusé {domain}.{action} : {device_meta}")
-
-    def _write(self, serial: str, domain: str, prop: str, value: Any) -> None:
-        """Écrit une propriété.
-
-        Contrairement aux actions, une écriture de propriété n'obtient jamais
-        de `deviceMeta` : le cloud répond seul. Le `200` n'atteste donc que la
-        réception côté serveur — c'est une relecture, quelques secondes plus
-        tard, qui dit si l'appareil a adopté la valeur.
-        """
-        response = self._client.set_iot_feature(
-            serial, RESOURCE, LOCAL_INDEX, domain, prop, value
-        )
-        if (response.get("meta") or {}).get("code") != 200:
-            raise RuntimeError(f"Le cloud a refusé {domain}.{prop} : {response}")
-
-    def _set_std_clean(self, serial: str, key: str, value: Any) -> None:
-        """Change un réglage global : aspiration, eau ou nombre de passages.
-
-        Le tableau est relu puis réécrit ENTIER. C'est tout le secret : une
-        écriture partielle remplace l'objet par ce qu'on envoie, et le robot
-        rejette silencieusement un `StdCleanCfg` amputé — d'où la conclusion,
-        longtemps tenue pour acquise, que ces réglages n'étaient pas
-        pilotables.
-
-        La relecture précède chaque écriture pour ne pas réimposer des valeurs
-        périmées si le réglage a bougé depuis l'application EZVIZ.
-        """
-        current = self._read(serial, DOMAIN_MAP, PROP_STD_CLEAN)
-        if not isinstance(current, list) or not current:
-            raise RuntimeError(
-                "StdCleanCfg illisible : impossible de régler sans connaître "
-                "la configuration en place"
-            )
-
-        updated = deepcopy(current)
-        for entry in updated:
-            if isinstance(entry, dict):
-                entry[key] = value
-        self._write(serial, DOMAIN_MAP, PROP_STD_CLEAN, updated)
-
-    def set_fan_mode(self, serial: str, mode: str) -> None:
-        """`mode` vaut quiet, normal, strong ou super."""
-        self._set_std_clean(serial, "fanMode", mode)
-
-    def set_water_quantity(self, serial: str, level: str) -> None:
-        """`level` vaut dry, low, middle ou high."""
-        self._set_std_clean(serial, "waterQuantity", level)
-
-    def set_clean_times(self, serial: str, times: int) -> None:
-        """Nombre de passages sur chaque surface."""
-        self._set_std_clean(serial, "cleanTimes", times)
 
     def clean(self, serial: str, action: str) -> None:
         """`action` vaut start, pause, resume ou stop."""
