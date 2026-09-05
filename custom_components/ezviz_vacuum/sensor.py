@@ -82,8 +82,9 @@ class EzvizVacuumError(EzvizVacuumBaseEntity, SensorEntity):
 class EzvizVacuumFanMode(EzvizVacuumBaseEntity, SensorEntity):
     """Puissance d'aspiration configurée sur le robot.
 
-    En lecture seule : la modifier demanderait une écriture de propriété, qui
-    n'atteint pas l'appareil. Se règle donc depuis l'application EZVIZ.
+    Doublon assumé du `fan_speed` de l'entité aspirateur, qui lui se règle.
+    Ce capteur est conservé parce qu'il existait avant, et qu'on ne casse pas
+    les tableaux de bord qui le citent déjà.
     """
 
     _attr_entity_category = EntityCategory.DIAGNOSTIC
@@ -95,13 +96,7 @@ class EzvizVacuumFanMode(EzvizVacuumBaseEntity, SensorEntity):
 
     @property
     def native_value(self) -> str | None:
-        std_clean = self._data.get("std_clean")
-        if not isinstance(std_clean, list) or not std_clean:
-            return None
-        first = std_clean[0]
-        if not isinstance(first, dict):
-            return None
-        mode = first.get("fanMode")
+        mode = self._std_clean.get("fanMode")
         return FAN_SPEEDS.get(mode, mode)
 
 

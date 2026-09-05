@@ -17,10 +17,14 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from . import EzvizVacuumConfigEntry
 from .const import (
     CLEANING_STATES,
+    FAN_SPEEDS,
     PAUSED_STATES,
     RETURNING_STATES,
     STATE_DRYING_MOP,
 )
+
+#: Libellé affiché -> `fanMode` attendu par le robot.
+FAN_MODE_BY_LABEL = {label: mode for mode, label in FAN_SPEEDS.items()}
 from .entity import EzvizVacuumBaseEntity
 
 _LOGGER = logging.getLogger(__name__)
@@ -29,8 +33,9 @@ _LOGGER = logging.getLogger(__name__)
 def _supported_features() -> VacuumEntityFeature:
     """Uniquement ce qui atteint réellement le robot.
 
-    Ni `FAN_SPEED` ni `CLEAN_AREA` : ils reposeraient sur des écritures de
-    propriété, qui n'arrivent jamais jusqu'à l'appareil (voir le README).
+    `FAN_SPEED` en fait partie depuis qu'on sait écrire `StdCleanCfg` en
+    entier — voir `EzvizVacuumApi._set_std_clean`. Toujours pas de
+    `CLEAN_AREA` : le nettoyage par pièce reste hors de portée.
     `STATE` a été retiré de certaines versions, d'où le test.
     """
     features = (
@@ -39,6 +44,7 @@ def _supported_features() -> VacuumEntityFeature:
         | VacuumEntityFeature.STOP
         | VacuumEntityFeature.RETURN_HOME
         | VacuumEntityFeature.SEND_COMMAND
+        | VacuumEntityFeature.FAN_SPEED
     )
     if hasattr(VacuumEntityFeature, "STATE"):
         features |= VacuumEntityFeature.STATE
@@ -108,6 +114,15 @@ class EzvizVacuum(EzvizVacuumBaseEntity, StateVacuumEntity):
         return self._last_activity
 
     @property
+    def fan_speed(self) -> str | None:
+        mode = self._std_clean.get("fanMode")
+        return FAN_SPEEDS.get(mode, mode)
+
+    @property
+    def fan_speed_list(self) -> list[str]:
+        return list(FAN_SPEEDS.values())
+
+    @property
     def extra_state_attributes(self) -> dict[str, Any]:
         task = self._task
         attributes: dict[str, Any] = {
@@ -154,6 +169,20 @@ class EzvizVacuum(EzvizVacuumBaseEntity, StateVacuumEntity):
     async def async_stop(self, **kwargs: Any) -> None:
         await self.coordinator.async_send(
             self.coordinator.api.clean, self._serial, "stop"
+        )
+
+    async def async_set_fan_speed(self, fan_speed: str, **kwargs: Any) -> None:
+        mode = FAN_MODE_BY_LABEL.get(fan_speed)
+        if mode is None:
+            raise ValueError(
+                f"Puissance inconnue : {fan_speed}. "
+                f"Attendu : {', '.join(self.fan_speed_list)}"
+            )
+        await self.coordinator.async_send(
+            self.coordinator.api.set_fan_mode,
+            self._serial,
+            mode,
+            refresh_slow=True,
         )
 
     async def async_return_to_base(self, **kwargs: Any) -> None:

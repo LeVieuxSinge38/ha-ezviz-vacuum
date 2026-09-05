@@ -9,49 +9,68 @@ Celle-ci parle au même cloud, par le bus « iot-feature ».
 
 ## Ce que ça donne
 
-Une entité `vacuum` — démarrage, pause, reprise, arrêt, retour à la base,
-puissance d'aspiration — plus des capteurs : batterie, panne en cours, et
+Une entité `vacuum` — démarrage, pause, reprise, arrêt, retour à la base et
+**puissance d'aspiration** — deux entités `select` pour le **volume d'eau** et
+le **nombre de passages**, plus des capteurs : batterie, panne en cours, et
 l'usure des cinq consommables (serpillère, filtre HEPA, brosses, capteurs).
 
-La puissance d'aspiration est exposée en **lecture seule** (capteur
-« Aspiration »), et les cartes et pièces du robot en attributs de l'entité.
+Les cartes et pièces du robot sont exposées en attributs de l'entité.
 
-## Ce que cette intégration ne peut pas faire
+## Écrire une propriété : le tableau doit être complet
 
-**Régler la puissance d'aspiration, et nettoyer une pièce précise.** Ces deux
-fonctions ont été implémentées, testées, puis **retirées** : elles ne
-fonctionnent pas, et ce n'est pas réparable côté intégration.
+Les trois réglages — aspiration, eau, passages — vivent ensemble dans la
+propriété `SweeperMapMgr.StdCleanCfg`. Ils s'écrivent, mais à une condition
+qui a longtemps fait croire le contraire : **il faut réécrire le tableau
+entier**.
 
-Le cloud EZVIZ expose deux routes. Elles ne sont pas équivalentes :
+Une écriture partielle remplace l'objet par ce qu'on envoie. Le robot reçoit
+alors un `StdCleanCfg` amputé de ses autres champs, et l'ignore — sans rien
+dire, puisqu'une écriture de propriété n'obtient jamais de `deviceMeta`. D'où
+la conclusion, tenue pour acquise pendant des mois, que ces réglages
+n'étaient pas pilotables.
+
+La recette qui marche :
+
+```python
+current = read("SweeperMapMgr", "StdCleanCfg")   # [{mapID, cleanConfigType,
+                                                 #   fanMode, waterQuantity,
+                                                 #   cleanTimes}]
+current[0]["fanMode"] = "quiet"
+set_iot_feature(serial, "SweepingRobot", "0",
+                "SweeperMapMgr", "StdCleanCfg", current)
+```
+
+**Comment savoir si l'appareil a vraiment adopté la valeur** : il republie son
+état toutes les ~4 s. Relire 15 s plus tard suffit — si la valeur tient, elle
+est passée ; si elle est revenue à l'ancienne, c'est le robot qui a écrasé le
+cache. Un `200` ne prouve rien, et l'application EZVIZ reste le juge de paix.
+
+Les deux routes du cloud ne sont donc pas équivalentes, mais la frontière
+n'est pas celle qu'on croyait :
 
 | Route | Effet | Réponse |
 |---|---|---|
-| `/v3/iot-feature/action/…` | atteint l'appareil | `200` **avec** `deviceMeta` |
-| `/v3/iot-feature/feature/…` | met à jour le cache du cloud | `200` **sans** `deviceMeta` |
+| `/v3/iot-feature/action/…` | commande l'appareil | `200` **avec** `deviceMeta` |
+| `/v3/iot-feature/feature/…` | écrit une propriété, que l'appareil adopte si elle est complète | `200` **sans** `deviceMeta` |
 
-Démarrer, mettre en pause et renvoyer à la base sont des **actions** : le
-robot les reçoit et les exécute.
+## Ce que cette intégration ne peut pas faire
 
-La puissance d'aspiration et la sélection des pièces sont des **propriétés**.
-Y écrire renvoie un `200` franc, et une relecture renvoie fidèlement la valeur
-écrite — mais c'est le cache du cloud qu'on relit. Vérifié sur l'appareil :
-après un changement depuis Home Assistant, le robot n'émet pas son bip de
-confirmation et l'application EZVIZ affiche toujours l'ancien réglage.
-
-Le piège est qu'une intégration naïve paraît fonctionner : l'entité affiche
-la nouvelle valeur, l'historique la confirme, et seul l'appareil sait que rien
-n'a changé. **Le bloc `deviceMeta` est le seul critère fiable.**
-
-Ces réglages restent donc à faire depuis l'application EZVIZ. Si quelqu'un
-trouve les actions correspondantes — elles existent forcément, l'application
-les utilise — la fonction se rebranche en quelques lignes.
+**Nettoyer une pièce précise.** L'action existe pourtant —
+`SweeperMapMgr.SetRoomCustomCleanCfg` (`sid=24`), et son schéma porte bien
+`fanMode`, `waterQuantity` et `cleanTimes` par pièce. Mais elle répond
+invariablement `0x00100003`, quelle que soit la charge utile : toutes les
+pièces des deux cartes, les zones personnalisées, avec ou sans `order`, avec
+ou sans `regionType`, avec `source`, et carte en `custom` au préalable. Le
+code ne varie jamais — ce n'est donc pas un problème de validation.
 
 ## Limites connues
 
 - **Cloud uniquement.** Aucune commande locale : sans Internet, rien ne
   répond. Le robot n'expose pas d'API sur le réseau local.
-- **Pas de nettoyage par pièce ni de réglage d'aspiration** — voir la section
-  précédente.
+- **Pas de nettoyage par pièce** — voir la section précédente.
+- **La serpillère sèche n'est proposée que globalement.** `StdCleanCfg`
+  accepte `dry`, mais le schéma par pièce ne connaît que `low`, `middle` et
+  `high`.
 - **La carte active change toute seule.** Le robot bascule entre ses cartes au
   fil de ses trajets ; un code qui suppose une carte fixe se trompera.
 - **Les pièces s'appellent « Pièce N ».** `RoomBasicProperty`, seule
@@ -101,14 +120,41 @@ détail qui a coûté le plus de temps.
       le robot*)
 - [x] **Étape 2 — Validation** : `start`, `pause`, `resume` et `stop` testés
       sur le robot, tous suivis d'effet
-- [ ] **Étape 3 — Intégration** : entité `vacuum` (start / pause / stop /
+- [x] **Étape 3 — Intégration** : entité `vacuum` (start / pause / stop /
       return_to_base / batterie / puissance d'aspiration)
 - [x] **Étape 4a — Schéma des cartes** : extrait, le nettoyage par pièce est
       pilotable (voir *Nettoyage par pièce*)
-- [x] **Étape 4b — Nettoyage par pièce** : implémenté, testé, **retiré** — les
-      écritures de propriété n'atteignent pas l'appareil
-- [ ] **Étape 5 — Actions manquantes** : trouver les actions `Plt2Dev` pour la
-      puissance d'aspiration et le nettoyage par pièce
+- [x] **Étape 4b — Nettoyage par pièce** : implémenté, testé, **retiré** —
+      `SetRoomCustomCleanCfg` répond `0x00100003` quoi qu'on lui envoie
+- [x] **Étape 5 — Réglages globaux** : aspiration, eau et passages, par
+      écriture du tableau `StdCleanCfg` complet (voir *Écrire une propriété*)
+- [ ] **Étape 6 — Le refus 0x00100003** : comprendre ce qui bloque
+      `SetRoomCustomCleanCfg`. Le profil complet du produit lèverait le doute,
+      mais il ne se télécharge pas : les URL de profil répondent toutes
+      `http allow list not found`. Il resterait la capture du trafic de
+      l'application EZVIZ.
+
+## Les actions connues
+
+Trouvées en écrivant une valeur invalide sur un nom candidat, route `action` :
+la réponse d'erreur contient le schéma complet (voir *La fuite de schéma*).
+Plus de 500 noms essayés pour ces six-là, tous dans `tools/`.
+
+| Domaine | Action | `sid` | Entrée |
+|---|---|---|---|
+| `SweeperCleanTask` | `CleanCtrl` | 6 | `action` ∈ start, pause, resume, stop |
+| `SweeperTaskMgr` | `RechargeCtrl` | 3 | `action` ∈ start, stop |
+| `SweeperMapMgr` | `SetCleanCfg` | 20 | `mapID`, `cleanConfigType` |
+| `SweeperMapMgr` | `SetRoomName` | 11 | `mapID`, `roomID`, `roomName` |
+| `SweeperMapMgr` | `SetRoomCustomCleanCfg` | 24 | réglages par pièce — **refuse** |
+| `SweeperMapMgr` | `SwitchMap` | 26 | l'identifiant de carte, en entier nu |
+
+Les `sid` manquants (1, 2, 4, 5, 7-10, 12-19, 21-23, 25) sont autant d'actions
+qui existent et dont on n'a pas trouvé le nom.
+
+⚠️ **`SetCleanCfg` n'applique que `cleanConfigType`.** Lui glisser `fanMode`
+en passager donne un accusé de réception du robot, et aucun effet : le cloud
+transmet les champs non déclarés, le firmware les jette.
 
 ## Ce qu'on sait (RE5 Plus, firmware V0.01.92)
 

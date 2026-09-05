@@ -39,5 +39,17 @@ class EzvizVacuumBaseEntity(CoordinatorEntity[EzvizVacuumCoordinator]):
         return task if isinstance(task, dict) else {}
 
     @property
+    def _std_clean(self) -> dict[str, Any]:
+        """Les réglages globaux : aspiration, eau, nombre de passages.
+
+        Le robot ne publie ce tableau que pour la carte en cours d'usage,
+        d'où l'unique entrée.
+        """
+        std = self._data.get("std_clean")
+        if isinstance(std, list) and std and isinstance(std[0], dict):
+            return std[0]
+        return {}
+
+    @property
     def available(self) -> bool:
         return super().available and self._serial in (self.coordinator.data or {})

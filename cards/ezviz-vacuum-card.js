@@ -140,6 +140,7 @@ class EzvizVacuumCard extends HTMLElement{
 
     this._cfg = Object.assign({
       name:null, battery:null, fault:null,
+      water:null, passes:null, show_settings:true,
       image:null, image_docked:null,
       consumables:[], consumable_mode:'wear', show_hours:true, alert_wear:85,
       font_scale:1, art_size:112, image_round:false,
@@ -342,6 +343,45 @@ class EzvizVacuumCard extends HTMLElement{
       transition:transform .3s ease}
     .chev.open ha-icon{transform:rotate(180deg)}
 
+    /* ---- réglages, dans le volet ----
+       Aspiration, eau et passages. Ils vivent sous le chevron plutôt qu'en
+       façade : ce sont des préférences, pas des commandes, et la carte
+       repliée doit rester lisible d'un coup d'œil. */
+    .sets{
+      display:flex;flex-direction:column;gap:9px;
+      margin-top:10px;padding-top:9px;
+      border-top:1px solid var(--divider-color, rgba(127,127,127,.2));
+    }
+    .sets:empty{display:none}
+    .set{display:flex;align-items:center;gap:10px}
+    .sk{
+      flex:none;width:calc(84px * var(--fs));
+      font-size:calc(.78rem * var(--fs));font-weight:500;
+      color:var(--secondary-text-color);
+    }
+    .seg{display:flex;flex-wrap:wrap;gap:5px;flex:1 1 0;min-width:0}
+    .s{
+      flex:1 1 auto;min-width:0;height:calc(26px * var(--fs));padding:0 9px;
+      border:0;border-radius:999px;cursor:pointer;background:transparent;
+      font-size:calc(.74rem * var(--fs));font-weight:600;
+      color:var(--primary-text-color);opacity:.72;
+      white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+      box-shadow:inset 0 0 0 1px
+        color-mix(in srgb, var(--primary-text-color) 18%, transparent);
+      transition:background .18s, box-shadow .18s, opacity .18s;
+      -webkit-tap-highlight-color:transparent;
+    }
+    .s:hover:not(:disabled){
+      background:color-mix(in srgb, var(--primary-text-color) 8%, transparent)}
+    /* Le segment retenu emprunte la couleur d'état de la carte : c'est elle
+       qui porte déjà l'identité, inutile d'introduire une teinte de plus. */
+    .s.on{
+      opacity:1;
+      background:color-mix(in srgb, var(--vc) 18%, transparent);
+      box-shadow:inset 0 0 0 1.5px color-mix(in srgb, var(--vc) 55%, transparent);
+    }
+    .s:disabled{opacity:.3;cursor:not-allowed}
+
     /* ---- entretien, replié ---- */
     .fold{
       display:grid;grid-template-rows:0fr;
@@ -375,6 +415,10 @@ class EzvizVacuumCard extends HTMLElement{
       .art{width:calc(var(--art) * .8);height:calc(var(--art) * .8)}
       .art.photo{width:calc(var(--art) * .9)}
       .cons{grid-template-columns:1fr}
+      /* Sur une carte étroite, l'étiquette passe au-dessus de ses segments :
+         côte à côte, il ne resterait que quelques pixels par pastille. */
+      .set{flex-direction:column;align-items:stretch;gap:4px}
+      .sk{width:auto}
     }
     @container (max-width: 330px){
       .nm{display:none}
@@ -404,7 +448,10 @@ class EzvizVacuumCard extends HTMLElement{
         <button class="b chev" title="Entretien">
           <ha-icon icon="mdi:chevron-down"></ha-icon></button>
       </div>
-      <div class="fold"><div class="foldin"><div class="cons"></div></div></div>
+      <div class="fold"><div class="foldin">
+        <div class="sets"></div>
+        <div class="cons"></div>
+      </div></div>
     </ha-card>`;
 
     const r = this.shadowRoot;
@@ -417,7 +464,7 @@ class EzvizVacuumCard extends HTMLElement{
       go:r.querySelector('.go'), pause:r.querySelector('.pause'),
       home:r.querySelector('.home'), chev:r.querySelector('.chev'),
       fold:r.querySelector('.fold'), cons:r.querySelector('.cons'),
-      badge:r.querySelector('.badge')
+      sets:r.querySelector('.sets'), badge:r.querySelector('.badge')
     };
     this._el.card.style.setProperty('--fs', String(this._cfg.font_scale));
     this._el.card.style.setProperty('--art', this._cfg.art_size + 'px');
@@ -429,6 +476,14 @@ class EzvizVacuumCard extends HTMLElement{
       if(v) this.style.setProperty('--ez-' + k, v);
     }
     this._el.art.classList.toggle('photo', this._photo);
+
+    /* Les segments sont réécrits à chaque changement de valeur : on écoute
+       donc le conteneur, une fois pour toutes, plutôt que chaque pastille. */
+    this._el.sets.addEventListener('click', ev => {
+      const b = ev.target.closest('button[data-row]');
+      if(!b || b.disabled) return;
+      this._setOption(b, b.dataset.row, b.dataset.val);
+    });
 
     this._el.go.addEventListener('click', () => this._call('start'));
     this._el.pause.addEventListener('click', () => this._call('pause'));
@@ -449,6 +504,73 @@ class EzvizVacuumCard extends HTMLElement{
     this._el.fold.classList.toggle('open', this._open);
     this._el.chev.classList.toggle('open', this._open);
     this._built = true;
+  }
+
+  /* Les trois réglages du robot : l'aspiration est portée par l'entité
+     aspirateur elle-même (`fan_speed`), l'eau et les passages par deux
+     entités `select` de l'intégration. */
+  _rows(){
+    const c = this._cfg, h = this._hass;
+    if(!h || !c.show_settings) return [];
+    const rows = [];
+
+    const st = h.states[c.entity];
+    const fanList = (st && st.attributes.fan_speed_list) || [];
+    if(fanList.length)
+      rows.push({key:'fan', label:'Aspiration',
+                 options:fanList, current:st.attributes.fan_speed});
+
+    for(const [key, entity, label] of [['water', c.water, 'Eau'],
+                                       ['passes', c.passes, 'Passages']]){
+      if(!entity) continue;
+      const s = h.states[entity];
+      const options = s && s.attributes.options;
+      if(!Array.isArray(options) || !options.length) continue;
+      rows.push({key, label, options, current:s.state});
+    }
+    return rows;
+  }
+
+  _paintSets(){
+    const rows = this._rows();
+    /* Réécrire à chaque relevé effacerait le survol en cours et ferait
+       clignoter les pastilles : on ne redessine que si quelque chose a
+       réellement changé. */
+    const sig = JSON.stringify(rows);
+    this._setsCount = rows.length;
+    if(sig === this._setsSig) return this._setsCount;
+    this._setsSig = sig;
+
+    const esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;')
+                              .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    this._el.sets.innerHTML = rows.map(row =>
+      '<div class="set"><span class="sk">' + esc(row.label) + '</span>' +
+      '<div class="seg">' + row.options.map(opt =>
+        '<button class="s' + (opt === row.current ? ' on' : '') +
+        '" data-row="' + esc(row.key) + '" data-val="' + esc(opt) +
+        '" title="' + esc(opt) + '">' + esc(opt) + '</button>'
+      ).join('') + '</div></div>'
+    ).join('');
+    return rows.length;
+  }
+
+  _setOption(button, row, value){
+    if(!this._hass) return;
+    /* Le cloud met quelques secondes à confirmer : on marque tout de suite
+       la pastille choisie, quitte à ce que le prochain relevé la corrige. */
+    for(const sib of button.parentElement.children)
+      sib.classList.toggle('on', sib === button);
+    this._setsSig = null;
+
+    if(row === 'fan'){
+      this._hass.callService('vacuum', 'set_fan_speed',
+        {fan_speed:value}, {entity_id:this._cfg.entity});
+      return;
+    }
+    const entity = row === 'water' ? this._cfg.water : this._cfg.passes;
+    if(entity)
+      this._hass.callService('select', 'select_option',
+        {option:value}, {entity_id:entity});
   }
 
   _call(service){
@@ -601,7 +723,10 @@ class EzvizVacuumCard extends HTMLElement{
         col + '"></i></div></div>';
     }
     e.cons.innerHTML = rows;
-    e.chev.style.display = rows ? '' : 'none';
+    /* Le chevron n'a de raison d'être que si le volet contient quelque
+       chose : les consommables, les réglages, ou les deux. */
+    const nbSets = this._paintSets();
+    e.chev.style.display = (rows || nbSets) ? '' : 'none';
 
     /* Un consommable en fin de vie n'a pas à attendre qu'on déplie la carte :
        un point rouge clignotant le signale, et son infobulle dit lequel. */
@@ -655,6 +780,12 @@ const EVC_SCHEMA = [
   {name:'consumables',
    selector:{entity:{domain:'sensor', multiple:true}}},
 
+  {name:'', type:'expandable', title:'Réglages du robot', schema:[
+    {name:'water', selector:{entity:{domain:'select'}}},
+    {name:'passes', selector:{entity:{domain:'select'}}},
+    {name:'show_settings', selector:{boolean:{}}}
+  ]},
+
   /* `name:''` est obligatoire : avec un nom, ha-form range les champs de la
      section dans un sous-objet portant ce nom, et la carte, qui les lit à la
      racine, ne voit plus rien changer. Le titre passe par `title`. */
@@ -697,6 +828,8 @@ const EVC_LABELS = {
   entity:'Aspirateur', name:'Titre affiché',
   battery:'Capteur de batterie', fault:'Capteur de panne',
   consumables:'Consommables suivis',
+  water:'Volume d\'eau', passes:'Nombre de passages',
+  show_settings:'Afficher les réglages dans le volet',
   image_docked:'Photo sur la base',
   image:'Photo en fonctionnement', image_round:'Recadrer la photo en rond',
   art_size:'Taille de la photo (px)', font_scale:'Taille du texte',
@@ -708,6 +841,9 @@ const EVC_LABELS = {
 };
 
 const EVC_HELPERS = {
+  water:'Entité « Volume d\'eau » de l\'intégration.',
+  passes:'Entité « Passages » de l\'intégration.',
+  show_settings:'L\'aspiration apparaît d\'office, elle vient de l\'aspirateur lui-même.',
   image_docked:'Adresse média, par exemple media-source://media_source/local/re5-base.png',
   image:'Affichée dès que le robot quitte sa base.',
   alert_wear:'Au-delà, un point rouge clignote dans le coin de la carte.',
