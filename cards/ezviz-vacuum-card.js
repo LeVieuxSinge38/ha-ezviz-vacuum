@@ -96,7 +96,7 @@ class EzvizVacuumCard extends HTMLElement{
       name:null, battery:null, fault:null,
       consumables:[], consumable_mode:'wear', show_hours:true, alert_wear:85,
       font_scale:1, size:56,
-      stuck_after:5, unstick_delay:5
+      stuck_after:2, unstick_delay:5
     }, cfg);
 
     this._cons = (cfg.consumables || []).map(c =>
@@ -385,7 +385,7 @@ class EzvizVacuumCard extends HTMLElement{
           String(fs.state).toLowerCase())) return true;
     }
 
-    const seuil = evcNum(c.stuck_after) || 5;
+    const seuil = evcNum(c.stuck_after) || 2;
     const a = st.attributes || {};
 
     /* Un dépannage remet le compteur à zéro. Sans ça, le robot met jusqu'à
@@ -396,11 +396,18 @@ class EzvizVacuumCard extends HTMLElement{
       (Date.now() - Math.max(new Date(horodatage).getTime(),
                              this._fixedAt || 0)) / 60000;
 
-    /* Muet et hors de sa base. */
+    /* Muet et hors de sa base — le cas des vrais blocages. Ce qui borne ce
+       seuil par le bas, c'est le clignotement de `task_state` : il alterne
+       toutes les 20 à 40 secondes pendant un nettoyage normal. Deux minutes
+       laissent trois fois cette marge ; descendre à une minute ferait
+       clignoter le triangle alors que tout va bien. */
     if(!a.in_charging && !a.task_state) return depuis(st.last_updated) >= seuil;
 
-    /* Arrêté et bavard. */
-    if(st.state === 'idle') return depuis(st.last_changed) >= seuil;
+    /* Arrêté et bavard. Autre mécanisme, autre contrainte : entre deux
+       sessions, un `idle` parfaitement normal dure jusqu'à 3 minutes. Ce
+       seuil-là ne peut donc pas descendre aussi bas que l'autre, et il ne
+       suit pas le réglage. */
+    if(st.state === 'idle') return depuis(st.last_changed) >= Math.max(seuil, 5);
 
     return false;
   }
@@ -645,8 +652,9 @@ const EVC_LABELS = {
 
 const EVC_HELPERS = {
   size:'C\'est elle qui fixe la hauteur de la carte.',
-  stuck_after:'Au-delà, le triangle de dépannage apparaît. Un arrêt normal '
-    + 'entre deux sessions dure moins de 3 minutes.',
+  stuck_after:'Silence du robot au-delà duquel le triangle apparaît. Ne pas '
+    + 'descendre sous 2 minutes : task_state clignote toutes les 20 à '
+    + '40 secondes en nettoyage normal.',
   unstick_delay:'Entre le retour à la base et la relance.',
   alert_wear:'Au-delà, un point rouge apparaît sur le chevron.'
 };

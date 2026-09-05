@@ -84,8 +84,18 @@ d'immobilité, celle où le robot annonce un état au lieu de se taire :
 | entre deux sessions, normal | 30 s à 3 min |
 | blocages réels | 22 min, 31 min, 2 h 51 |
 
-Le seuil par défaut est de **5 minutes**, dans le creux entre les deux.
-Réglable, comme le délai entre les deux commandes.
+**Deux mécanismes, deux seuils** — ils n'ont pas la même contrainte :
+
+| Mécanisme | Ce qui le borne | Seuil |
+|---|---|---|
+| silence (les vrais blocages) | le clignotement de `task_state`, 20 à 40 s | **2 min**, réglable |
+| `idle` prolongé | un arrêt normal entre deux sessions, jusqu'à 3 min | 5 min, fixe |
+
+Le seuil réglable est celui du silence, parce que c'est lui qui attrape les
+blocages et qu'on le veut court : on va à la tablette *parce qu'on a vu* le
+robot coincé, le bouton doit déjà être là. Ne pas descendre sous 2 minutes,
+sous peine de voir le triangle clignoter en plein nettoyage normal — et un
+voyant qui crie au loup finit par ne plus être vu.
 
 ⚠️ Un robot immobilisé ne publie plus rien : sans changement d'état, Home
 Assistant ne réveille jamais la carte. Elle se redessine donc d'elle-même
