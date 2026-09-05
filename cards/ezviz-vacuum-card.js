@@ -209,9 +209,10 @@ class EzvizVacuumCard extends HTMLElement{
     .ico:hover:not(:disabled){
       background:color-mix(in srgb, var(--primary-text-color) 12%, transparent)}
     .ico:active:not(:disabled){transform:scale(.92)}
-    .ico:disabled{opacity:.3;cursor:default}
-    .ico.on{background:color-mix(in srgb, var(--vc) 20%, transparent)}
-    .ico.on ha-icon{opacity:1;color:var(--vc)}
+    /* Une commande indisponible disparaît au lieu de se griser : elle ne dit
+       rien d'utile, et sa place rendue au texte évite que l'état soit
+       tronqué sur une carte étroite. */
+    .ico.gone{display:none}
 
     /* ---- dépannage ----
        Absent tant que tout va bien. Quand le robot s'immobilise, il apparaît
@@ -559,14 +560,19 @@ class EzvizVacuumCard extends HTMLElement{
     e.fix.classList.toggle('show', this._stuck());
     e.fix.disabled = !!this._fixing;
 
-    /* ---- commandes ---- */
+    /* ---- commandes ----
+       On n'affiche que ce qui est faisable ici et maintenant. En nettoyage,
+       « Démarrer » n'a plus de sens et s'efface ; à la base, ce sont « Pause »
+       et « Retour à la base » qui disparaissent. La place ainsi rendue revient
+       au libellé d'état, qui sinon se retrouve tronqué. */
     const dead = !st || state === 'unavailable';
-    e.go.disabled    = dead || state === 'cleaning';
-    e.pause.disabled = dead || (state !== 'cleaning' && state !== 'returning');
-    e.home.disabled  = dead || state === 'docked' || state === 'returning';
-    e.go.classList.toggle('on', state === 'cleaning');
-    e.pause.classList.toggle('on', state === 'paused');
-    e.home.classList.toggle('on', state === 'returning' || state === 'docked');
+    const commande = (el, faisable) => {
+      el.classList.toggle('gone', !faisable);
+      el.disabled = !faisable;
+    };
+    commande(e.go,    !dead && state !== 'cleaning');
+    commande(e.pause, !dead && (state === 'cleaning' || state === 'returning'));
+    commande(e.home,  !dead && state !== 'docked' && state !== 'returning');
   }
 
   getCardSize(){ return 1; }
