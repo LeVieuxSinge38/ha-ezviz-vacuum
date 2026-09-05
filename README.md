@@ -43,6 +43,34 @@ l'usure des cinq consommables (serpillère, filtre HEPA, brosses, capteurs).
 La puissance d'aspiration est exposée en **lecture seule** (capteur
 « Aspiration »), et les cartes et pièces du robot en attributs de l'entité.
 
+## Le bouton de dépannage
+
+Quand le robot se coince — une serviette, une roue en l'air — la pause ne le
+repart pas une fois dégagé : il faut lui redonner un ordre de **retour à la
+base**, qui solde la tâche en cours, avant de pouvoir en lancer une nouvelle.
+La carte enchaîne les deux, derrière un triangle de détresse qui clignote en
+rouge et n'apparaît que dans ce cas.
+
+**Le détecter a demandé de renoncer à l'évidence.** Ni `CurrentTask.exception`
+ni l'état `error` ne servent à rien ici : sur dix jours d'historique, le
+capteur de panne n'a jamais quitté « ok », y compris pendant des blocages
+avérés. Ce firmware ne remonte pas les incidents physiques.
+
+Ce qui se voit, c'est l'immobilité. Coincé, le robot tombe en `idle` — ni sur
+sa base, ni en train de nettoyer — et il y reste :
+
+| `idle` observés | Durée |
+|---|---|
+| entre deux sessions, normal | 30 s à 3 min |
+| blocages réels | 22 min, 31 min, 2 h 51 |
+
+Le seuil par défaut est donc de **5 minutes**, dans le creux entre les deux.
+Réglable, comme le délai entre les deux commandes.
+
+⚠️ Un robot immobilisé ne publie plus rien : sans changement d'état, Home
+Assistant ne réveille jamais la carte. Elle se redessine donc d'elle-même
+toutes les 30 secondes, uniquement pour regarder l'heure.
+
 ## Ce que cette intégration ne peut pas faire
 
 **Régler l'aspiration, le volume d'eau et le nombre de passages**, et

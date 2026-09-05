@@ -83,6 +83,8 @@ class EzvizVacuumCard extends HTMLElement{
     /* État attendu après un appui, le temps que le robot publie le sien. */
     this._pending = null;
     this._pendUntil = 0;
+    /* Manœuvre de dépannage en cours. */
+    this._fixing = false;
   }
 
   setConfig(cfg){
@@ -93,7 +95,8 @@ class EzvizVacuumCard extends HTMLElement{
     this._cfg = Object.assign({
       name:null, battery:null, fault:null,
       consumables:[], consumable_mode:'wear', show_hours:true, alert_wear:85,
-      font_scale:1, size:56
+      font_scale:1, size:56,
+      stuck_after:5, unstick_delay:5
     }, cfg);
 
     this._cons = (cfg.consumables || []).map(c =>
@@ -210,6 +213,27 @@ class EzvizVacuumCard extends HTMLElement{
     .ico.on{background:color-mix(in srgb, var(--vc) 20%, transparent)}
     .ico.on ha-icon{opacity:1;color:var(--vc)}
 
+    /* ---- dépannage ----
+       Absent tant que tout va bien. Quand le robot s'immobilise, il apparaît
+       en rouge et clignote, comme le triangle de détresse d'une voiture :
+       c'est une anomalie, elle a le droit d'attirer l'œil.
+
+       Sa visibilité passe par la classe « show », et surtout pas par « on » :
+       cette dernière marque la commande en cours et porte la couleur d'état,
+       qui l'emporterait sur le rouge.
+
+       (Pas d'accent grave dans ce commentaire : tout ce bloc CSS vit dans un
+       littéral de gabarit, un seul accent grave y fermerait la chaîne.) */
+    .fix{display:none;background:color-mix(in srgb, #ff453a 16%, transparent)}
+    .fix.show{display:flex;animation:evc-blink 1.1s ease-in-out infinite}
+    .fix ha-icon{color:#ff453a;opacity:1}
+    .fix:hover:not(:disabled){
+      background:color-mix(in srgb, #ff453a 28%, transparent)}
+    @keyframes evc-blink{50%{opacity:.35}}
+    /* Pendant la manœuvre, il cesse de clignoter : le geste est en cours,
+       il n'y a plus rien à signaler. */
+    .fix.busy{animation:none;opacity:.55}
+
     /* Le chevron n'est pas une commande : plus petit, sans fond. */
     .chev{
       width:calc(22px * var(--fs));height:calc(34px * var(--fs));
@@ -274,6 +298,8 @@ class EzvizVacuumCard extends HTMLElement{
           </div>
         </div>
         <div class="cmd">
+          <button class="ico fix" title="Débloquer : retour à la base, puis relance">
+            <ha-icon icon="mdi:hazard-lights"></ha-icon></button>
           <button class="ico go" title="Démarrer">
             <ha-icon icon="mdi:play"></ha-icon></button>
           <button class="ico pause" title="Pause">
@@ -294,6 +320,7 @@ class EzvizVacuumCard extends HTMLElement{
       nm:r.querySelector('.nm'), st:r.querySelector('.st'),
       lbl:r.querySelector('.lbl'), bat:r.querySelector('.bat'),
       chg:r.querySelector('.chg'),
+      fix:r.querySelector('.fix'),
       go:r.querySelector('.go'), pause:r.querySelector('.pause'),
       home:r.querySelector('.home'), chev:r.querySelector('.chev'),
       fold:r.querySelector('.fold'), cons:r.querySelector('.cons')
@@ -302,6 +329,7 @@ class EzvizVacuumCard extends HTMLElement{
     this._el.card.style.setProperty('--art',
       Math.round(this._cfg.size * this._cfg.font_scale) + 'px');
 
+    this._el.fix.addEventListener('click', () => this._unstick());
     this._el.go.addEventListener('click', () => this._call('start'));
     this._el.pause.addEventListener('click', () => this._call('pause'));
     this._el.home.addEventListener('click', () => this._call('return_to_base'));
@@ -324,6 +352,62 @@ class EzvizVacuumCard extends HTMLElement{
     this._built = true;
   }
 
+  /* Le robot est-il immobilisé ?
+
+     Ni le capteur de panne ni l'état `error` ne servent à rien ici : sur ce
+     firmware, `CurrentTask.exception` ne remonte pas les incidents physiques
+     — vérifié sur dix jours d'historique, il n'a jamais quitté « ok », y
+     compris pendant des blocages avérés. On les surveille quand même, au cas
+     où un autre modèle serait plus bavard.
+
+     Ce qui se voit, en revanche, c'est l'immobilité : coincé, le robot tombe
+     en `idle` — ni sur sa base, ni en train de nettoyer — et il y reste. Les
+     `idle` normaux, avant ou après une session, durent de 30 secondes à
+     3 minutes ; les blocages observés, de 22 minutes à près de 3 heures. Le
+     seuil de 5 minutes tombe dans un creux franc. */
+  _stuck(){
+    const c = this._cfg, h = this._hass;
+    if(!h || this._pending || this._fixing) return false;
+    const st = h.states[c.entity];
+    if(!st) return false;
+
+    if(st.state === 'error') return true;
+    if(c.fault){
+      const fs = h.states[c.fault];
+      if(fs && fs.state && !['ok','unknown','unavailable',''].includes(
+          String(fs.state).toLowerCase())) return true;
+    }
+    if(st.state !== 'idle') return false;
+
+    const minutes = (Date.now() - new Date(st.last_changed).getTime()) / 60000;
+    return minutes >= (evcNum(c.stuck_after) || 5);
+  }
+
+  /* Retour à la base, puis relance.
+
+     Une fois le robot dégagé à la main, la pause ne le repart pas : il faut
+     lui redonner un ordre de retour, qui solde la tâche en cours, avant de
+     pouvoir en lancer une nouvelle. Le bouton enchaîne les deux, avec le
+     délai qu'on laisserait en le faisant soi-même. */
+  async _unstick(){
+    if(!this._hass || this._fixing) return;
+    this._fixing = true;
+    this._paint();
+
+    const cible = {entity_id:this._cfg.entity};
+    this._hass.callService('vacuum', 'return_to_base', {}, cible);
+
+    const attente = (evcNum(this._cfg.unstick_delay) || 5) * 1000;
+    await new Promise(r => setTimeout(r, attente));
+
+    this._hass.callService('vacuum', 'start', {}, cible);
+    this._fixing = false;
+    /* Le robot met une vingtaine de secondes à publier son nouvel état. */
+    this._pending = 'cleaning';
+    this._pendUntil = Date.now() + 30000;
+    this._paint();
+  }
+
   _call(service){
     if(!this._hass) return;
     /* Le robot met une vingtaine de secondes à publier son nouvel état. On
@@ -337,6 +421,20 @@ class EzvizVacuumCard extends HTMLElement{
       this._paint();
     }
     this._hass.callService('vacuum', service, {}, {entity_id:this._cfg.entity});
+  }
+
+  /* Un robot immobilisé ne publie plus rien : sans état qui change, Home
+     Assistant ne réveille jamais la carte, et le bouton de dépannage
+     n'apparaîtrait donc jamais. On se redessine donc de nous-mêmes, une fois
+     par demi-minute, uniquement pour regarder l'heure. */
+  connectedCallback(){
+    clearInterval(this._tick);
+    this._tick = setInterval(
+      () => { if(this._built && this._hass) this._paint(); }, 30000);
+  }
+  disconnectedCallback(){
+    clearInterval(this._tick);
+    this._tick = null;
   }
 
   set hass(h){
@@ -429,6 +527,14 @@ class EzvizVacuumCard extends HTMLElement{
     e.chev.classList.toggle('warn', worn.length > 0);
     e.chev.title = worn.length ? 'À remplacer : ' + worn.join(', ') : 'Entretien';
 
+    /* ---- dépannage ----
+       Le second argument de classList.toggle doit être un vrai booléen : un
+       `undefined` n'est pas « faux », il fait basculer la classe au lieu de
+       la retirer, et le bouton s'allumerait un redessin sur deux. */
+    e.fix.classList.toggle('show', !!(this._stuck() || this._fixing));
+    e.fix.classList.toggle('busy', !!this._fixing);
+    e.fix.disabled = !!this._fixing;
+
     /* ---- commandes ---- */
     const dead = !st || state === 'unavailable';
     e.go.disabled    = dead || state === 'cleaning';
@@ -475,6 +581,13 @@ const EVC_SCHEMA = [
      selector:{number:{min:.8, max:1.3, step:.02, mode:'slider'}}}
   ]},
 
+  {name:'', type:'expandable', title:'Dépannage', schema:[
+    {name:'stuck_after',
+     selector:{number:{min:2, max:30, step:1, mode:'slider'}}},
+    {name:'unstick_delay',
+     selector:{number:{min:2, max:20, step:1, mode:'slider'}}}
+  ]},
+
   {name:'', type:'expandable', title:'Entretien', schema:[
     {name:'consumable_mode', selector:{select:{mode:'dropdown', options:[
       {value:'wear', label:'Usure (100 % = à remplacer)'},
@@ -492,6 +605,8 @@ const EVC_LABELS = {
   battery:'Capteur de batterie', fault:'Capteur de panne',
   consumables:'Consommables suivis',
   size:'Taille du robot (px)', font_scale:'Taille du texte',
+  stuck_after:'Immobile depuis (min)',
+  unstick_delay:'Délai avant la relance (s)',
   consumable_mode:'Afficher',
   alert_wear:'Seuil du point d\'alerte (%)',
   show_hours:'Afficher les heures restantes',
@@ -500,6 +615,9 @@ const EVC_LABELS = {
 
 const EVC_HELPERS = {
   size:'C\'est elle qui fixe la hauteur de la carte.',
+  stuck_after:'Au-delà, le triangle de dépannage apparaît. Un arrêt normal '
+    + 'entre deux sessions dure moins de 3 minutes.',
+  unstick_delay:'Entre le retour à la base et la relance.',
   alert_wear:'Au-delà, un point rouge apparaît sur le chevron.'
 };
 
