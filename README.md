@@ -52,7 +52,12 @@ La puissance d'aspiration est exposée en **lecture seule** (capteur
 
 Seules les commandes utiles ici et maintenant sont affichées : « Démarrer »
 disparaît en nettoyage, « Pause » et « Retour à la base » quand il est
-arrimé. Le triangle rouge, lui, n'apparaît que si le robot s'immobilise.
+arrimé.
+
+Coincé, la carte passe **en entier** en alerte — « Bloqué » en rouge,
+animations arrêtées, triangle de détresse clignotant. Le robot, lui,
+continue souvent d'annoncer qu'il nettoie : c'est le propre de la panne, il
+ne sait pas qu'il ne va nulle part.
 
 ## Le bouton de dépannage
 
