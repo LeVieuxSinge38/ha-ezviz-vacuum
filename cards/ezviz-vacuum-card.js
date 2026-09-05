@@ -42,18 +42,20 @@ const EVC_FAULTS = {
   CR_DockPumpSewageFail:'Vidange impossible'
 };
 
-/* Photos livrées avec la carte : l'utilisateur n'a rien à configurer.
-   Elles se résolvent par rapport à l'adresse du script — ce qui suppose une
-   vraie adresse. Une ressource « inline » est une data: URI, sans base : on
-   renonce alors aux valeurs par défaut plutôt que de fabriquer une adresse
-   cassée, et le dessin prend le relais. */
-const EVC_BASE = (() => {
-  const src = document.currentScript && document.currentScript.src;
-  if(!src || src.startsWith('data:')) return null;
-  return src.replace(/[^/]*$/, '');
-})();
-const EVC_IMG_DOCKED = EVC_BASE ? EVC_BASE + 'images/re5-base.png' : null;
-const EVC_IMG_TOP    = EVC_BASE ? EVC_BASE + 'images/re5-dessus.png' : null;
+/* Les deux photos du robot, embarquées dans le fichier.
+
+   Elles ne sont ni configurables, ni téléchargées, ni cherchées dans un
+   dossier média : la carte se suffit à elle-même, où qu'elle soit installée
+   et quelle que soit la façon dont elle est servie. C'est la seule manière
+   d'être sûr que tout le monde les voie sans avoir rien à faire.
+
+   Détourées, recadrées sur le robot puis mises au carré — le balayage du
+   lidar est un cercle centré sur le cadre, il n'épouse la coque que si le
+   cadre est carré. WebP 224 px : la carte n'affiche que 96 px au maximum,
+   224 couvre les écrans à haute densité, et pèse quatre fois moins qu'un
+   PNG de même qualité. */
+const EVC_PHOTO_DOCKED = 'data:image/webp;base64,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';
+const EVC_PHOTO_MOVING = 'data:image/webp;base64,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';
 
 function evcNum(v){
   if(v === null || v === undefined) return NaN;
@@ -72,46 +74,12 @@ function evcWearColor(w){
   return EVC_OK;
 }
 
-/* Robot vu de dessus, à défaut de photo. Coque claire, tourelle lidar,
-   pare-chocs sombre, brosse latérale. L'anneau porte la couleur d'état. */
-const EVC_ART = `
-<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
-  <defs>
-    <radialGradient id="evcTop" cx="0.36" cy="0.3" r="0.78">
-      <stop offset="0"    stop-color="#ffffff"/>
-      <stop offset="0.55" stop-color="#e9edf2"/>
-      <stop offset="1"    stop-color="#b9c1cc"/>
-    </radialGradient>
-  </defs>
-  <circle class="halo" cx="50" cy="50" r="47" fill="none"
-          stroke="var(--vc)" stroke-width="1.6" opacity=".3"/>
-  <circle cx="50" cy="50" r="41" fill="url(#evcTop)"/>
-  <path d="M18,58 A41,41 0 0,0 82,58 L82,63 A41,41 0 0,1 18,63 Z"
-        fill="#232a33" opacity=".92"/>
-  <path class="sweep" d="M50,50 L50,9 A41,41 0 0,1 79,21 Z"
-        fill="var(--vc)" opacity="0"/>
-  <circle cx="50" cy="38" r="12.5" fill="#39414c"/>
-  <circle cx="50" cy="38" r="8.5"  fill="#151b22"/>
-  <circle class="lidar" cx="50" cy="38" r="3.6" fill="var(--vc)"/>
-  <circle cx="30" cy="60" r="4" fill="#e3e8ee"/>
-  <g class="brush" transform="translate(70,66)">
-    <circle r="4" fill="#39414c"/>
-    <g stroke="#f8fafc" stroke-opacity=".9" stroke-width="1.8"
-       stroke-linecap="round">
-      <path d="M0,0 L11,-4"/><path d="M0,0 L-5,10"/><path d="M0,0 L-7,-8"/>
-    </g>
-  </g>
-</svg>`;
-
 class EzvizVacuumCard extends HTMLElement{
   constructor(){
     super();
     this.attachShadow({mode:'open'});
     this._built = false;
     this._open = false;
-    /* Adresses résolues des `media-source://`, avec leur péremption. */
-    this._srcCache = {};
-    this._curId = null;
     /* État attendu après un appui, le temps que le robot publie le sien. */
     this._pending = null;
     this._pendUntil = 0;
@@ -124,24 +92,14 @@ class EzvizVacuumCard extends HTMLElement{
 
     this._cfg = Object.assign({
       name:null, battery:null, fault:null,
-      image:undefined, image_docked:undefined, image_round:true,
       consumables:[], consumable_mode:'wear', show_hours:true, alert_wear:85,
       font_scale:1, size:56
     }, cfg);
-
-    /* Sans consigne, on prend les photos livrées avec la carte. `null`
-       explicite reste un refus : on retombe alors sur le dessin. */
-    if(this._cfg.image === undefined) this._cfg.image = EVC_IMG_TOP;
-    if(this._cfg.image_docked === undefined)
-      this._cfg.image_docked = EVC_IMG_DOCKED;
 
     this._cons = (cfg.consumables || []).map(c =>
       typeof c === 'string' ? {entity:c, name:null}
                             : {entity:c.entity, name:c.name || null});
     this._open = !!cfg.expanded;
-
-    this._photo = !!(this._cfg.image || this._cfg.image_docked);
-    const art = this._photo ? '<img alt="">' : EVC_ART;
 
     this.shadowRoot.innerHTML = `
     <style>
@@ -166,12 +124,7 @@ class EzvizVacuumCard extends HTMLElement{
       flex:none;position:relative;cursor:pointer;
       width:var(--art);height:var(--art);
     }
-    .art svg, .art img{display:block;width:100%;height:100%}
-    .art img{object-fit:contain}
-    /* Vu de dessus, le robot est rond : un cadrage circulaire efface les
-       coins blancs de la photo produit, et le balayage épouse alors
-       exactement le bord de la coque. */
-    .art.round img{object-fit:cover;border-radius:50%}
+    .art img{display:block;width:100%;height:100%;object-fit:contain}
 
     /* Balayage du lidar et anneau qui se propage : les deux seules
        animations de la carte, réservées au travail en cours. */
@@ -195,19 +148,6 @@ class EzvizVacuumCard extends HTMLElement{
       0%{opacity:.5;transform:scale(.85)}
       100%{opacity:0;transform:scale(1.14)}
     }
-    .brush{transform-origin:70px 66px}
-    .busy .brush{animation:evc-spin .9s linear infinite}
-    @keyframes evc-spin{to{transform:translate(70px,66px) rotate(360deg)}}
-    .busy .lidar{animation:evc-pulse 1.4s ease-in-out infinite}
-    @keyframes evc-pulse{50%{opacity:.2}}
-    .busy .sweep{animation:evc-sweep 2.4s linear infinite;
-      transform-origin:50px 50px}
-    @keyframes evc-sweep{
-      0%{opacity:.22;transform:rotate(0deg)}
-      100%{opacity:.22;transform:rotate(360deg)}
-    }
-    .busy .halo{animation:evc-halo 2s ease-in-out infinite}
-    @keyframes evc-halo{50%{opacity:.8}}
 
     /* ---- nom, état, batterie ---- */
     .txt{
@@ -323,8 +263,8 @@ class EzvizVacuumCard extends HTMLElement{
     </style>
     <ha-card>
       <div class="main">
-        <div class="art">` + art +
-          `<div class="scan"></div><div class="pulse"></div></div>
+        <div class="art"><img alt="">
+          <div class="scan"></div><div class="pulse"></div></div>
         <div class="txt">
           <div class="nm"></div>
           <div class="st">
@@ -361,19 +301,6 @@ class EzvizVacuumCard extends HTMLElement{
     this._el.card.style.setProperty('--fs', String(this._cfg.font_scale));
     this._el.card.style.setProperty('--art',
       Math.round(this._cfg.size * this._cfg.font_scale) + 'px');
-
-    /* Une photo introuvable ne doit pas laisser un cadre vide : on repasse
-       au dessin, qui ne dépend de rien. Le cas se présente si les images
-       livrées n'ont pas suivi, ou si une adresse configurée est fausse. */
-    if(this._el.img)
-      this._el.img.addEventListener('error', () => {
-        this._photo = false;
-        this._curId = null;
-        this._el.img.remove();
-        this._el.img = null;
-        this._el.art.classList.remove('round');
-        this._el.art.insertAdjacentHTML('afterbegin', EVC_ART);
-      });
 
     this._el.go.addEventListener('click', () => this._call('start'));
     this._el.pause.addEventListener('click', () => this._call('pause'));
@@ -412,39 +339,6 @@ class EzvizVacuumCard extends HTMLElement{
     this._hass.callService('vacuum', service, {}, {entity_id:this._cfg.entity});
   }
 
-  /* Une image de la médiathèque n'a pas d'adresse fixe : Home Assistant la
-     sert sous une signature qui expire. On la lui redemande donc, et on la
-     garde quelques heures plutôt que d'interroger à chaque rafraîchissement. */
-  async _applyPhoto(id){
-    if(!id || !this._el.img) return;
-    this._curId = id;
-
-    if(!id.startsWith('media-source://')){
-      if(this._el.img.getAttribute('src') !== id)
-        this._el.img.setAttribute('src', id);
-      return;
-    }
-
-    const hit = this._srcCache[id];
-    if(hit && Date.now() < hit.until){
-      if(this._el.img.getAttribute('src') !== hit.url)
-        this._el.img.setAttribute('src', hit.url);
-      return;
-    }
-
-    try{
-      const r = await this._hass.callWS({
-        type:'media_source/resolve_media', media_content_id:id, expires:86400
-      });
-      this._srcCache[id] = {url:r.url, until:Date.now() + 6 * 3600 * 1000};
-      /* L'état a pu changer pendant l'attente : on n'écrase pas l'image
-         courante si ce n'est plus celle qu'on veut afficher. */
-      if(this._curId === id) this._el.img.setAttribute('src', r.url);
-    }catch(err){
-      console.error('ezviz-vacuum-card : image introuvable', id, err);
-    }
-  }
-
   set hass(h){
     this._hass = h;
     if(this._pending){
@@ -464,16 +358,9 @@ class EzvizVacuumCard extends HTMLElement{
     e.card.style.setProperty('--vc', info.col);
     e.nm.textContent = c.name || (st ? st.attributes.friendly_name : 'Aspirateur');
 
-    if(this._photo && e.img){
-      const want = (state === 'docked' && c.image_docked)
-        ? c.image_docked
-        : (c.image || c.image_docked);
-      /* Cadrage rond réservé à la vue de dessus : celle sur la base est plus
-         large que haute, un cercle lui couperait la station. */
-      e.art.classList.toggle('round',
-        c.image_round !== false && !!c.image && want === c.image);
-      if(want !== this._curId) this._applyPhoto(want);
-    }
+    /* Sur sa station quand il y est, vu de dessus dès qu'il en part. */
+    const photo = state === 'docked' ? EVC_PHOTO_DOCKED : EVC_PHOTO_MOVING;
+    if(e.img.getAttribute('src') !== photo) e.img.setAttribute('src', photo);
 
     e.main.classList.toggle('busy', info.busy);
 
@@ -585,13 +472,7 @@ const EVC_SCHEMA = [
     {name:'size',
      selector:{number:{min:40, max:96, step:2, mode:'slider'}}},
     {name:'font_scale',
-     selector:{number:{min:.8, max:1.3, step:.02, mode:'slider'}}},
-    {name:'image_round', selector:{boolean:{}}}
-  ]},
-
-  {name:'', type:'expandable', title:'Photos', schema:[
-    {name:'image_docked', selector:{text:{}}},
-    {name:'image', selector:{text:{}}}
+     selector:{number:{min:.8, max:1.3, step:.02, mode:'slider'}}}
   ]},
 
   {name:'', type:'expandable', title:'Entretien', schema:[
@@ -611,8 +492,6 @@ const EVC_LABELS = {
   battery:'Capteur de batterie', fault:'Capteur de panne',
   consumables:'Consommables suivis',
   size:'Taille du robot (px)', font_scale:'Taille du texte',
-  image_round:'Recadrer la vue de dessus en rond',
-  image_docked:'Photo sur la base', image:'Photo en fonctionnement',
   consumable_mode:'Afficher',
   alert_wear:'Seuil du point d\'alerte (%)',
   show_hours:'Afficher les heures restantes',
@@ -621,8 +500,6 @@ const EVC_LABELS = {
 
 const EVC_HELPERS = {
   size:'C\'est elle qui fixe la hauteur de la carte.',
-  image_docked:'Laisser vide pour la photo livrée avec la carte.',
-  image:'Affichée dès que le robot quitte sa base. Vide = photo livrée.',
   alert_wear:'Au-delà, un point rouge apparaît sur le chevron.'
 };
 

@@ -31,6 +31,8 @@ Puis installer, redémarrer Home Assistant, et ajouter l'intégration
 
 **La carte** : copier `cards/ezviz-vacuum-card.js` dans `www/`, puis
 l'ajouter en ressource Lovelace (`/local/ezviz-vacuum-card.js`, type module).
+Un seul fichier suffit — les photos du robot y sont embarquées, il n'y a
+rien à déposer dans le dossier média ni à configurer.
 
 ## Ce que ça donne
 
