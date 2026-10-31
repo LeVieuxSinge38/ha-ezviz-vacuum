@@ -26,8 +26,8 @@ const EVC_OK   = '#34c759';
 const EVC_WARN = '#ff9f0a';
 const EVC_LOW  = '#ff453a';
 
-/* Textes de la carte, par langue. Le français est la langue par défaut :
-   une langue inconnue, ou absente de la configuration, retombe dessus.
+/* Textes de la carte, par langue. L'anglais est la langue de repli :
+   une langue inconnue retombe dessus.
 
    `faults` : pannes du firmware, traduites. Les absentes s'affichent telles
    quelles. */
@@ -61,6 +61,7 @@ const EVC_I18N = {
       errDomain:'Cette carte attend une entité du domaine vacuum'
     },
     editor:{
+      auto:'Automatique (langue de Home Assistant)',
       sections:{look:'Apparence', fix:'Dépannage', maint:'Entretien'},
       modes:{wear:'Usure (100 % = à remplacer)',
              remaining:'Restant (0 % = à remplacer)'},
@@ -113,6 +114,7 @@ const EVC_I18N = {
       errDomain:'This card expects an entity from the vacuum domain'
     },
     editor:{
+      auto:'Automatic (Home Assistant language)',
       sections:{look:'Appearance', fix:'Troubleshooting', maint:'Maintenance'},
       modes:{wear:'Wear (100 % = replace)',
              remaining:'Remaining (0 % = replace)'},
@@ -138,8 +140,14 @@ const EVC_I18N = {
   }
 };
 
-function evcLang(lang){
-  return EVC_I18N[String(lang || '').toLowerCase()] || EVC_I18N.fr;
+/* Langue retenue : celle de la configuration si elle est donnée, sinon
+   celle que l'utilisateur a choisie dans son profil Home Assistant
+   (`hass.language`). On n'en garde que le préfixe — « en-GB » devient
+   « en ». Tout ce qui n'est ni français ni anglais retombe sur l'anglais. */
+function evcLang(lang, hass){
+  const choix = (lang && lang !== 'auto') ? lang : (hass && hass.language);
+  const code = String(choix || '').toLowerCase().split('-')[0];
+  return EVC_I18N[code] || EVC_I18N.en;
 }
 
 /* Les deux photos du robot, embarquées dans le fichier.
@@ -194,7 +202,7 @@ class EzvizVacuumCard extends HTMLElement{
       throw new Error(T.ui.errDomain);
 
     this._cfg = Object.assign({
-      name:null, battery:null, fault:null, language:'fr',
+      name:null, battery:null, fault:null, language:'auto',
       consumables:[], consumable_mode:'wear', show_hours:true, alert_wear:85,
       font_scale:1, size:56,
       stuck_delay:0
@@ -598,7 +606,16 @@ class EzvizVacuumCard extends HTMLElement{
   }
 
   _paint(){
-    const c = this._cfg, e = this._el, T = this._t;
+    const c = this._cfg, e = this._el;
+    /* La langue de Home Assistant n'est connue qu'ici, avec `hass` : les
+       infobulles, posées à la construction, sont donc remises à jour quand
+       elle change. */
+    const T = evcLang(c.language, this._hass);
+    if(T !== this._t){
+      this._t = T;
+      e.fix.title = T.ui.fix; e.go.title = T.ui.start;
+      e.pause.title = T.ui.pause; e.home.title = T.ui.home;
+    }
     const st = this._hass.states[c.entity];
     const state = this._pending || (st ? st.state : 'unavailable');
     const info = EVC_STATES[state] || {col:'#8e8e93', busy:false};
@@ -728,6 +745,7 @@ const evcSchema = (T) => [
   {name:'entity', required:true, selector:{entity:{domain:'vacuum'}}},
   {name:'name', selector:{text:{}}},
   {name:'language', selector:{select:{mode:'dropdown', options:[
+    {value:'auto', label:T.editor.auto},
     {value:'fr', label:'Français'},
     {value:'en', label:'English'}
   ]}}},
@@ -771,7 +789,11 @@ class EzvizVacuumCardEditor extends HTMLElement{
   }
   set hass(h){
     this._hass = h;
-    if(this._form) this._form.hass = h;
+    if(!this._form) return;
+    this._form.hass = h;
+    /* En mode automatique, l'éditeur suit lui aussi la langue de Home
+       Assistant, qui n'arrive qu'avec `hass`. */
+    if(evcLang(this._config.language, h) !== this._t) this._render();
   }
 
   _render(){
@@ -790,7 +812,7 @@ class EzvizVacuumCardEditor extends HTMLElement{
       this._form = f;
     }
     /* La langue choisie s'applique à l'éditeur lui-même, dès qu'on la change. */
-    this._t = evcLang(this._config.language);
+    this._t = evcLang(this._config.language, this._hass);
     this._form.schema = evcSchema(this._t);
     if(this._hass) this._form.hass = this._hass;
     this._form.data = this._toForm(this._config);
@@ -800,6 +822,7 @@ class EzvizVacuumCardEditor extends HTMLElement{
      accepte aussi la forme {entity, name}. */
   _toForm(cfg){
     return Object.assign({}, cfg, {
+      language:cfg.language || 'auto',
       consumables:(cfg.consumables || []).map(
         c => typeof c === 'string' ? c : c.entity)
     });
@@ -809,6 +832,8 @@ class EzvizVacuumCardEditor extends HTMLElement{
     const out = Object.assign({type:this._config.type}, data);
     for(const k of Object.keys(out))
       if(out[k] === undefined || out[k] === '') delete out[k];
+    /* « Automatique » est le comportement par défaut : inutile de l'écrire. */
+    if(out.language === 'auto') delete out.language;
     return out;
   }
 }
