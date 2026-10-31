@@ -13,34 +13,134 @@
 
 /* Couleur d'état. Discrètes, elles ne servent qu'au point et au balayage. */
 const EVC_STATES = {
-  cleaning:   {t:'En nettoyage',     col:'#34c759', busy:true},
-  returning:  {t:'Retour à la base', col:'#0a84ff', busy:true},
-  paused:     {t:'En pause',         col:'#ff9f0a', busy:false},
-  docked:     {t:'À la base',        col:'#5ac8fa', busy:false},
-  idle:       {t:"À l'arrêt",        col:'#8e8e93', busy:false},
-  error:      {t:'Erreur',           col:'#ff453a', busy:false},
-  unavailable:{t:'Indisponible',     col:'#8e8e93', busy:false}
+  cleaning:   {col:'#34c759', busy:true},
+  returning:  {col:'#0a84ff', busy:true},
+  paused:     {col:'#ff9f0a', busy:false},
+  docked:     {col:'#5ac8fa', busy:false},
+  idle:       {col:'#8e8e93', busy:false},
+  error:      {col:'#ff453a', busy:false},
+  unavailable:{col:'#8e8e93', busy:false}
 };
 
 const EVC_OK   = '#34c759';
 const EVC_WARN = '#ff9f0a';
 const EVC_LOW  = '#ff453a';
 
-/* Pannes du firmware, traduites. Les absentes s'affichent telles quelles. */
-const EVC_FAULTS = {
-  CR_RollBrushTwine:'Brosse enroulée', CR_EdgeBrushTrapped:'Brosse latérale coincée',
-  CR_WheelTrapped:'Roue bloquée', CR_WheelSuspended:'Roue dans le vide',
-  CR_Trapped:'Robot coincé', CR_FailToReturnDock:'Retour impossible',
-  CR_LocationFailure:'Perte de repérage', CR_DustBoxOrBagUnset:'Bac absent',
-  CR_DustBoxUncover:'Bac ouvert', CR_CleanWaterBoxEmpty:'Réservoir vide',
-  CR_CleanWaterBoxLow:'Réservoir bas', CR_CleanWaterBoxUnsetup:'Réservoir absent',
-  CR_DirtyWaterBoxFull:'Eau sale pleine', CR_DirtyWaterBoxUnsetup:'Bac eau sale absent',
-  CR_AllWaterBoxUnsetup:'Réservoirs absents', CR_MopInstallErr:'Serpillère mal posée',
-  CR_MopTryDrop:'Serpillère détachée', CR_RollBrushUnsetup:'Brosse absente',
-  CR_LidarCoverErr:'Lidar obstrué', CR_LidarShieldErr:'Lidar masqué',
-  CR_DockCommErr:'Base injoignable', CR_DockDryFanStall:'Séchage bloqué',
-  CR_DockPumpSewageFail:'Vidange impossible'
+/* Textes de la carte, par langue. Le français est la langue par défaut :
+   une langue inconnue, ou absente de la configuration, retombe dessus.
+
+   `faults` : pannes du firmware, traduites. Les absentes s'affichent telles
+   quelles. */
+const EVC_I18N = {
+  fr:{
+    states:{
+      cleaning:'En nettoyage', returning:'Retour à la base', paused:'En pause',
+      docked:'À la base', idle:"À l'arrêt", error:'Erreur',
+      unavailable:'Indisponible'
+    },
+    faults:{
+      CR_RollBrushTwine:'Brosse enroulée', CR_EdgeBrushTrapped:'Brosse latérale coincée',
+      CR_WheelTrapped:'Roue bloquée', CR_WheelSuspended:'Roue dans le vide',
+      CR_Trapped:'Robot coincé', CR_FailToReturnDock:'Retour impossible',
+      CR_LocationFailure:'Perte de repérage', CR_DustBoxOrBagUnset:'Bac absent',
+      CR_DustBoxUncover:'Bac ouvert', CR_CleanWaterBoxEmpty:'Réservoir vide',
+      CR_CleanWaterBoxLow:'Réservoir bas', CR_CleanWaterBoxUnsetup:'Réservoir absent',
+      CR_DirtyWaterBoxFull:'Eau sale pleine', CR_DirtyWaterBoxUnsetup:'Bac eau sale absent',
+      CR_AllWaterBoxUnsetup:'Réservoirs absents', CR_MopInstallErr:'Serpillère mal posée',
+      CR_MopTryDrop:'Serpillère détachée', CR_RollBrushUnsetup:'Brosse absente',
+      CR_LidarCoverErr:'Lidar obstrué', CR_LidarShieldErr:'Lidar masqué',
+      CR_DockCommErr:'Base injoignable', CR_DockDryFanStall:'Séchage bloqué',
+      CR_DockPumpSewageFail:'Vidange impossible'
+    },
+    ui:{
+      vacuum:'Aspirateur', stuck:'Bloqué',
+      fix:'Débloquer : relancer le nettoyage', start:'Démarrer',
+      pause:'Pause', home:'Retour à la base',
+      maint:'Entretien', replace:'À remplacer : ',
+      errEntity:'Il faut renseigner "entity"',
+      errDomain:'Cette carte attend une entité du domaine vacuum'
+    },
+    editor:{
+      sections:{look:'Apparence', fix:'Dépannage', maint:'Entretien'},
+      modes:{wear:'Usure (100 % = à remplacer)',
+             remaining:'Restant (0 % = à remplacer)'},
+      labels:{
+        entity:'Aspirateur', name:'Titre affiché', language:'Langue',
+        battery:'Capteur de batterie', fault:'Capteur de panne',
+        consumables:'Consommables suivis',
+        size:'Taille du robot (px)', font_scale:'Taille du texte',
+        stuck_delay:'Immobile depuis (s)',
+        consumable_mode:'Afficher',
+        alert_wear:'Seuil du point d\'alerte (%)',
+        show_hours:'Afficher les heures restantes',
+        expanded:'Entretien déplié par défaut'
+      },
+      helpers:{
+        size:'C\'est elle qui fixe la hauteur de la carte.',
+        stuck_delay:'Immobilité au-delà de laquelle le triangle apparaît. Sous '
+          + 'ne vaut que pour l\'état « à l\'arrêt » : le silence garde un '
+          + 'plancher de 45 s, sous lequel il se déclencherait en plein nettoyage.',
+        alert_wear:'Au-delà, un point rouge apparaît sur le chevron.'
+      }
+    }
+  },
+  en:{
+    states:{
+      cleaning:'Cleaning', returning:'Returning to dock', paused:'Paused',
+      docked:'Docked', idle:'Idle', error:'Error',
+      unavailable:'Unavailable'
+    },
+    faults:{
+      CR_RollBrushTwine:'Brush tangled', CR_EdgeBrushTrapped:'Side brush stuck',
+      CR_WheelTrapped:'Wheel stuck', CR_WheelSuspended:'Wheel off the ground',
+      CR_Trapped:'Robot trapped', CR_FailToReturnDock:'Cannot return to dock',
+      CR_LocationFailure:'Lost its position', CR_DustBoxOrBagUnset:'Dustbin missing',
+      CR_DustBoxUncover:'Dustbin open', CR_CleanWaterBoxEmpty:'Water tank empty',
+      CR_CleanWaterBoxLow:'Water tank low', CR_CleanWaterBoxUnsetup:'Water tank missing',
+      CR_DirtyWaterBoxFull:'Dirty water full', CR_DirtyWaterBoxUnsetup:'Dirty water tank missing',
+      CR_AllWaterBoxUnsetup:'Water tanks missing', CR_MopInstallErr:'Mop badly fitted',
+      CR_MopTryDrop:'Mop detached', CR_RollBrushUnsetup:'Brush missing',
+      CR_LidarCoverErr:'Lidar obstructed', CR_LidarShieldErr:'Lidar covered',
+      CR_DockCommErr:'Dock unreachable', CR_DockDryFanStall:'Drying stalled',
+      CR_DockPumpSewageFail:'Draining failed'
+    },
+    ui:{
+      vacuum:'Vacuum', stuck:'Stuck',
+      fix:'Unstick: restart cleaning', start:'Start',
+      pause:'Pause', home:'Return to dock',
+      maint:'Maintenance', replace:'Replace: ',
+      errEntity:'You must set "entity"',
+      errDomain:'This card expects an entity from the vacuum domain'
+    },
+    editor:{
+      sections:{look:'Appearance', fix:'Troubleshooting', maint:'Maintenance'},
+      modes:{wear:'Wear (100 % = replace)',
+             remaining:'Remaining (0 % = replace)'},
+      labels:{
+        entity:'Vacuum', name:'Displayed title', language:'Language',
+        battery:'Battery sensor', fault:'Fault sensor',
+        consumables:'Tracked consumables',
+        size:'Robot size (px)', font_scale:'Text size',
+        stuck_delay:'Motionless for (s)',
+        consumable_mode:'Show',
+        alert_wear:'Alert dot threshold (%)',
+        show_hours:'Show remaining hours',
+        expanded:'Maintenance expanded by default'
+      },
+      helpers:{
+        size:'This is what sets the height of the card.',
+        stuck_delay:'How long the robot must be motionless before the warning '
+          + 'triangle appears. Only applies to the "idle" state: silence keeps '
+          + 'a 45 s floor, below which it would trigger mid-clean.',
+        alert_wear:'Above this, a red dot appears on the chevron.'
+      }
+    }
+  }
 };
+
+function evcLang(lang){
+  return EVC_I18N[String(lang || '').toLowerCase()] || EVC_I18N.fr;
+}
 
 /* Les deux photos du robot, embarquées dans le fichier.
 
@@ -88,12 +188,13 @@ class EzvizVacuumCard extends HTMLElement{
   }
 
   setConfig(cfg){
-    if(!cfg.entity) throw new Error('Il faut renseigner "entity"');
+    const T = this._t = evcLang(cfg.language);
+    if(!cfg.entity) throw new Error(T.ui.errEntity);
     if(cfg.entity.split('.')[0] !== 'vacuum')
-      throw new Error('Cette carte attend une entité du domaine vacuum');
+      throw new Error(T.ui.errDomain);
 
     this._cfg = Object.assign({
-      name:null, battery:null, fault:null,
+      name:null, battery:null, fault:null, language:'fr',
       consumables:[], consumable_mode:'wear', show_hours:true, alert_wear:85,
       font_scale:1, size:56,
       stuck_delay:0
@@ -296,16 +397,16 @@ class EzvizVacuumCard extends HTMLElement{
           </div>
         </div>
         <div class="cmd">
-          <button class="ico fix" title="Débloquer : relancer le nettoyage">
+          <button class="ico fix" title="${T.ui.fix}">
             <ha-icon icon="mdi:hazard-lights"></ha-icon></button>
-          <button class="ico go" title="Démarrer">
+          <button class="ico go" title="${T.ui.start}">
             <ha-icon icon="mdi:play"></ha-icon></button>
-          <button class="ico pause" title="Pause">
+          <button class="ico pause" title="${T.ui.pause}">
             <ha-icon icon="mdi:pause"></ha-icon></button>
-          <button class="ico home" title="Retour à la base">
+          <button class="ico home" title="${T.ui.home}">
             <ha-icon icon="mdi:home-import-outline"></ha-icon></button>
         </div>
-        <button class="ico chev" title="Entretien">
+        <button class="ico chev" title="${T.ui.maint}">
           <ha-icon icon="mdi:chevron-down"></ha-icon></button>
       </div>
       <div class="fold"><div class="foldin"><div class="cons"></div></div></div>
@@ -497,13 +598,14 @@ class EzvizVacuumCard extends HTMLElement{
   }
 
   _paint(){
-    const c = this._cfg, e = this._el;
+    const c = this._cfg, e = this._el, T = this._t;
     const st = this._hass.states[c.entity];
     const state = this._pending || (st ? st.state : 'unavailable');
-    const info = EVC_STATES[state] || {t:state, col:'#8e8e93', busy:false};
+    const info = EVC_STATES[state] || {col:'#8e8e93', busy:false};
+    const libelle = T.states[state] || state;
 
     e.card.style.setProperty('--vc', info.col);
-    e.nm.textContent = c.name || (st ? st.attributes.friendly_name : 'Aspirateur');
+    e.nm.textContent = c.name || (st ? st.attributes.friendly_name : T.ui.vacuum);
 
     /* Sur sa station quand il y est, vu de dessus dès qu'il en part. */
     const photo = state === 'docked' ? EVC_PHOTO_DOCKED : EVC_PHOTO_MOVING;
@@ -523,11 +625,11 @@ class EzvizVacuumCard extends HTMLElement{
       const fs = this._hass.states[c.fault];
       if(fs && fs.state && !['ok','unknown','unavailable',''].includes(
           String(fs.state).toLowerCase()))
-        fault = EVC_FAULTS[fs.state] || fs.state;
+        fault = T.faults[fs.state] || fs.state;
     }
-    const alerte = fault || (coince ? 'Bloqué' : '');
+    const alerte = fault || (coince ? T.ui.stuck : '');
     if(alerte) e.card.style.setProperty('--vc', EVC_LOW);
-    e.lbl.textContent = alerte || info.t;
+    e.lbl.textContent = alerte || libelle;
     e.st.classList.toggle('err', !!alerte);
 
     /* ---- batterie, sur la même ligne que l'état ---- */
@@ -581,7 +683,7 @@ class EzvizVacuumCard extends HTMLElement{
     e.cons.innerHTML = rows;
     e.chev.style.display = rows ? '' : 'none';
     e.chev.classList.toggle('warn', worn.length > 0);
-    e.chev.title = worn.length ? 'À remplacer : ' + worn.join(', ') : 'Entretien';
+    e.chev.title = worn.length ? T.ui.replace + worn.join(', ') : T.ui.maint;
 
     /* ---- dépannage ----
        Le second argument de classList.toggle doit être un vrai booléen : un
@@ -622,9 +724,13 @@ class EzvizVacuumCard extends HTMLElement{
    Éditeur visuel, sur `ha-form` : on hérite des sélecteurs natifs de Home
    Assistant (choix d'entité, curseurs) sans les réécrire.
    --------------------------------------------------------------------- */
-const EVC_SCHEMA = [
+const evcSchema = (T) => [
   {name:'entity', required:true, selector:{entity:{domain:'vacuum'}}},
   {name:'name', selector:{text:{}}},
+  {name:'language', selector:{select:{mode:'dropdown', options:[
+    {value:'fr', label:'Français'},
+    {value:'en', label:'English'}
+  ]}}},
   {name:'battery',
    selector:{entity:{domain:'sensor', device_class:'battery'}}},
   {name:'fault', selector:{entity:{domain:'sensor'}}},
@@ -634,22 +740,22 @@ const EVC_SCHEMA = [
   /* `name:''` est obligatoire : avec un nom, ha-form range les champs de la
      section dans un sous-objet portant ce nom, et la carte, qui les lit à la
      racine, ne voit plus rien changer. Le titre passe par `title`. */
-  {name:'', type:'expandable', title:'Apparence', schema:[
+  {name:'', type:'expandable', title:T.editor.sections.look, schema:[
     {name:'size',
      selector:{number:{min:40, max:96, step:2, mode:'slider'}}},
     {name:'font_scale',
      selector:{number:{min:.8, max:1.3, step:.02, mode:'slider'}}}
   ]},
 
-  {name:'', type:'expandable', title:'Dépannage', schema:[
+  {name:'', type:'expandable', title:T.editor.sections.fix, schema:[
     {name:'stuck_delay',
      selector:{number:{min:0, max:300, step:5, mode:'slider'}}},
   ]},
 
-  {name:'', type:'expandable', title:'Entretien', schema:[
+  {name:'', type:'expandable', title:T.editor.sections.maint, schema:[
     {name:'consumable_mode', selector:{select:{mode:'dropdown', options:[
-      {value:'wear', label:'Usure (100 % = à remplacer)'},
-      {value:'remaining', label:'Restant (0 % = à remplacer)'}
+      {value:'wear', label:T.editor.modes.wear},
+      {value:'remaining', label:T.editor.modes.remaining}
     ]}}},
     {name:'alert_wear',
      selector:{number:{min:50, max:100, step:1, mode:'slider'}}},
@@ -657,26 +763,6 @@ const EVC_SCHEMA = [
     {name:'expanded', selector:{boolean:{}}}
   ]}
 ];
-
-const EVC_LABELS = {
-  entity:'Aspirateur', name:'Titre affiché',
-  battery:'Capteur de batterie', fault:'Capteur de panne',
-  consumables:'Consommables suivis',
-  size:'Taille du robot (px)', font_scale:'Taille du texte',
-  stuck_delay:'Immobile depuis (s)',
-  consumable_mode:'Afficher',
-  alert_wear:'Seuil du point d\'alerte (%)',
-  show_hours:'Afficher les heures restantes',
-  expanded:'Entretien déplié par défaut'
-};
-
-const EVC_HELPERS = {
-  size:'C\'est elle qui fixe la hauteur de la carte.',
-  stuck_delay:'Immobilité au-delà de laquelle le triangle apparaît. Sous '
-    + 'ne vaut que pour l\'état « à l\'arrêt » : le silence garde un '
-    + 'plancher de 45 s, sous lequel il se déclencherait en plein nettoyage.',
-  alert_wear:'Au-delà, un point rouge apparaît sur le chevron.'
-};
 
 class EzvizVacuumCardEditor extends HTMLElement{
   setConfig(config){
@@ -691,8 +777,8 @@ class EzvizVacuumCardEditor extends HTMLElement{
   _render(){
     if(!this._form){
       const f = document.createElement('ha-form');
-      f.computeLabel = sc => EVC_LABELS[sc.name] || sc.name;
-      f.computeHelper = sc => EVC_HELPERS[sc.name] || '';
+      f.computeLabel = sc => this._t.editor.labels[sc.name] || sc.name;
+      f.computeHelper = sc => this._t.editor.helpers[sc.name] || '';
       f.addEventListener('value-changed', ev => {
         ev.stopPropagation();
         this.dispatchEvent(new CustomEvent('config-changed', {
@@ -703,7 +789,9 @@ class EzvizVacuumCardEditor extends HTMLElement{
       this.appendChild(f);
       this._form = f;
     }
-    this._form.schema = EVC_SCHEMA;
+    /* La langue choisie s'applique à l'éditeur lui-même, dès qu'on la change. */
+    this._t = evcLang(this._config.language);
+    this._form.schema = evcSchema(this._t);
     if(this._hass) this._form.hass = this._hass;
     this._form.data = this._toForm(this._config);
   }

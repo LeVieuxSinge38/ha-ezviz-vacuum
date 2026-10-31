@@ -37,6 +37,10 @@ l'ajouter en ressource Lovelace (`/local/ezviz-vacuum-card.js`, type module).
 Un seul fichier suffit — les photos du robot y sont embarquées, il n'y a
 rien à déposer dans le dossier média ni à configurer.
 
+La carte est en français par défaut ; `language: en` la passe en anglais
+(aussi réglable dans l'éditeur visuel). *The card defaults to French; set
+`language: en` for English.*
+
 ## Ce que ça donne
 
 Une entité `vacuum` — démarrage, pause, reprise, arrêt, retour à la base —
