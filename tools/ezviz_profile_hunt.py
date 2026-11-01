@@ -32,13 +32,16 @@ from __future__ import annotations
 
 import getpass
 import json
+import os
 import sys
 import time
 
 from pyezvizapi import EzvizClient
 
 REGION = "apiieu.ezvizlife.com"
-SERIAL = "BD1522206"
+SERIAL = os.environ.get("EZVIZ_SERIAL", "").upper()
+if not SERIAL:
+    sys.exit("Numero de serie du robot manquant : definir EZVIZ_SERIAL.")
 RESOURCE = "SweepingRobot"
 IDX = "0"
 PRODUCT_ID = "CS-RE5P-TWT"

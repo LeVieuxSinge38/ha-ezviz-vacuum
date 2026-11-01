@@ -24,13 +24,14 @@ from __future__ import annotations
 
 import getpass
 import json
+import os
 import sys
 import time
 
 from pyezvizapi import EzvizClient
 
 REGION = "apiieu.ezvizlife.com"
-DEFAULT_SERIAL = "BD1522206"
+DEFAULT_SERIAL = os.environ.get("EZVIZ_SERIAL", "")
 RESOURCE = "SweepingRobot"
 IDX = "0"
 TASK_DOMAIN = "SweeperTaskMgr"
@@ -99,6 +100,8 @@ def send(client, serial, state: str):
 
 def main() -> None:
     serial = (sys.argv[1] if len(sys.argv) > 1 else DEFAULT_SERIAL).upper()
+    if not serial:
+        sys.exit("Numero de serie du robot manquant : le passer en argument ou via EZVIZ_SERIAL.")
 
     account = input("Compte EZVIZ : ").strip()
     password = getpass.getpass("Mot de passe EZVIZ : ")

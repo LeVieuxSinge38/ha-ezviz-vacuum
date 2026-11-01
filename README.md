@@ -357,7 +357,7 @@ L'appel suivant fonctionne et renvoie la valeur en direct :
 
 ```python
 client.get_device_feature_value(
-    "BD1522206", "SweepingRobot", "PowerMgr", "SurplusPower", local_index="0"
+    "<NUMERO_DE_SERIE>", "SweepingRobot", "PowerMgr", "SurplusPower", local_index="0"
 )
 # -> {"meta": {"code": 200}, "data": 77}
 ```
@@ -410,7 +410,7 @@ Les commandes passent par la route **`action`**, jamais par `feature` :
 
 ```python
 client.set_iot_action(
-    "BD1522206", "SweepingRobot", "0",
+    "<NUMERO_DE_SERIE>", "SweepingRobot", "0",
     "SweeperCleanTask", "CleanCtrl",
     {"action": "start", "source": "mobile"},
 )
@@ -433,7 +433,7 @@ seul `action` est requis.
 
 ```python
 client.set_iot_action(
-    "BD1522206", "SweepingRobot", "0",
+    "<NUMERO_DE_SERIE>", "SweepingRobot", "0",
     "SweeperTaskMgr", "RechargeCtrl",
     {"action": "start", "source": "mobile"},
 )
@@ -627,7 +627,7 @@ qu'on veut sans jamais rien déclencher.
 messages d'erreur — la route à paramètres recrache son objet interne :
 
 ```
-FeatureGetParam(devSerial=BD1522206, protocol=0, channelNo=0,
+FeatureGetParam(devSerial=<NUMERO_DE_SERIE>, protocol=0, channelNo=0,
                 itemKey=…, productId=CS-RE5P-TWT,
                 firmVersion=V0.01.92 build 240428, vFeatureItem=null)
 ```
@@ -660,6 +660,10 @@ python3 tools/ezviz_dump.py
 > Le fichier `ezviz_dump.json` contient les numéros de série et codes de
 > vérification de tous les appareils du compte. Il est ignoré par Git —
 > ne le commite jamais.
+
+Les autres scripts ont besoin du numéro de série du robot : en argument
+(`[SERIAL]`) ou dans la variable d'environnement `EZVIZ_SERIAL`
+(`export EZVIZ_SERIAL=XXXXXXXXX`). Aucun numéro n'est écrit dans le code.
 
 ### `tools/ezviz_probe.py`
 
