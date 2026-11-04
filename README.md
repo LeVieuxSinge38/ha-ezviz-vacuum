@@ -37,6 +37,12 @@ l'ajouter en ressource Lovelace (`/local/ezviz-vacuum-card.js`, type module).
 Un seul fichier suffit — les photos du robot y sont embarquées, il n'y a
 rien à déposer dans le dossier média ni à configurer.
 
+La carte suit la langue de Home Assistant (français ou anglais, anglais
+pour toute autre langue) ; `language: fr` ou `language: en` l'impose
+(aussi réglable dans l'éditeur visuel). *The card follows the Home
+Assistant language (English or French, English otherwise); set
+`language: en` or `language: fr` to force one.*
+
 ## Ce que ça donne
 
 Une entité `vacuum` — démarrage, pause, reprise, arrêt, retour à la base —
