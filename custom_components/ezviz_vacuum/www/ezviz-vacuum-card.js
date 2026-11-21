@@ -249,6 +249,18 @@ class EzvizVacuumCard extends HTMLElement{
     }
 
     /* ---- entretien, replié ---- */
+    /* Une pastille par carte du robot : bascule sur la bonne carte, puis lance.
+       Le robot ne devine plus où il est — c'est en devinant mal qu'il en
+       dessinait une nouvelle, sans les zones interdites. */
+    .rooms{display:flex;flex-wrap:wrap;gap:calc(6px * var(--fs));
+      padding:0 calc(12px * var(--fs)) calc(10px * var(--fs))}
+    .rooms:empty,.rooms.off{display:none}
+    .room{flex:1 1 0;min-width:0;border:0;cursor:pointer;font:inherit;
+      font-size:calc(13px * var(--fs));padding:calc(7px * var(--fs)) 8px;
+      border-radius:999px;color:var(--primary-text-color);
+      background:color-mix(in srgb, var(--vc) 14%, transparent);
+      white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .room:active{transform:scale(.96)}
     .fold{display:grid;grid-template-rows:0fr;
       transition:grid-template-rows .3s ease}
     .fold.open{grid-template-rows:1fr}
@@ -308,6 +320,7 @@ class EzvizVacuumCard extends HTMLElement{
         <button class="ico chev" title="Entretien">
           <ha-icon icon="mdi:chevron-down"></ha-icon></button>
       </div>
+      <div class="rooms"></div>
       <div class="fold"><div class="foldin"><div class="cons"></div></div></div>
     </ha-card>`;
 
@@ -321,7 +334,7 @@ class EzvizVacuumCard extends HTMLElement{
       fix:r.querySelector('.fix'),
       go:r.querySelector('.go'), pause:r.querySelector('.pause'),
       home:r.querySelector('.home'), chev:r.querySelector('.chev'),
-      fold:r.querySelector('.fold'), cons:r.querySelector('.cons')
+      rooms:r.querySelector('.rooms'), fold:r.querySelector('.fold'), cons:r.querySelector('.cons')
     };
     this._el.card.style.setProperty('--fs', String(this._cfg.font_scale));
     this._el.card.style.setProperty('--art',
@@ -444,6 +457,38 @@ class EzvizVacuumCard extends HTMLElement{
     this._paint();
   }
 
+  /* Les cartes nommées du robot. Celles qu'il crée seul portent « #@… » :
+     ce sont justement celles qu'on ne veut pas. */
+  _paintRooms(st, state){
+    const e = this._el;
+    const maps = ((st && st.attributes.maps) || [])
+      .filter(m => m && m.name && !String(m.name).startsWith('#@'));
+    const cle = maps.map(m => m.id + ':' + m.name).join('|');
+    if(cle !== this._roomsKey){
+      this._roomsKey = cle;
+      e.rooms.innerHTML = '';
+      for(const m of maps){
+        const b = document.createElement('button');
+        b.className = 'room';
+        b.textContent = String(m.name).replace(/^Good\s+/i, '');
+        b.title = 'Lancer sur la carte « ' + m.name + ' »';
+        b.addEventListener('click', () => this._cleanMap(m.id));
+        e.rooms.appendChild(b);
+      }
+    }
+    /* Seulement quand il attend : en route, la carte est déjà choisie. */
+    e.rooms.classList.toggle('off', !['docked','idle'].includes(state));
+  }
+
+  _cleanMap(id){
+    if(!this._hass) return;
+    this._pending = 'cleaning';
+    this._pendUntil = Date.now() + 45000;
+    this._paint();
+    this._hass.callService('vacuum', 'send_command',
+      {command:'clean_map', params:{map:id}}, {entity_id:this._cfg.entity});
+  }
+
   _call(service){
     if(!this._hass) return;
     /* Le robot met une vingtaine de secondes à publier son nouvel état. On
@@ -541,6 +586,8 @@ class EzvizVacuumCard extends HTMLElement{
     e.bat.textContent = isNaN(pct) ? '' : '· ' + Math.round(pct) + ' %';
     e.bat.classList.toggle('low', !isNaN(pct) && pct <= 20);
     e.chg.classList.toggle('on', charging);
+
+    this._paintRooms(st, state);
 
     /* ---- entretien ----
        Le capteur donne les heures restantes, son attribut les heures faites :

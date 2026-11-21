@@ -32,8 +32,9 @@ Puis installer, redémarrer Home Assistant, et ajouter l'intégration
 **À la main** : copier `custom_components/ezviz_vacuum/` dans le dossier
 `custom_components/` de ta configuration, puis redémarrer.
 
-**La carte** : copier `cards/ezviz-vacuum-card.js` dans `www/`, puis
-l'ajouter en ressource Lovelace (`/local/ezviz-vacuum-card.js`, type module).
+**La carte** : l'intégration la sert elle-même, et HACS la met à jour avec
+elle. Il suffit de l'ajouter une fois en ressource Lovelace :
+`/ezviz_vacuum/ezviz-vacuum-card.js`, type module.
 Un seul fichier suffit — les photos du robot y sont embarquées, il n'y a
 rien à déposer dans le dossier média ni à configurer.
 
@@ -45,6 +46,21 @@ l'usure des cinq consommables (serpillère, filtre HEPA, brosses, capteurs).
 
 La puissance d'aspiration est exposée en **lecture seule** (capteur
 « Aspiration »), et les cartes et pièces du robot en attributs de l'entité.
+
+**Lancer sur une carte précise.** Un robot à plusieurs cartes doit deviner
+sur laquelle il se trouve ; quand il se trompe, il en dessine une nouvelle,
+sans les zones interdites. La carte Lovelace affiche donc, à l'arrêt, une
+pastille par carte nommée : un appui bascule le robot sur cette carte
+(`SwitchMap`), attend qu'il la confirme, puis lance le nettoyage. Même chose
+en service :
+
+```yaml
+action: vacuum.send_command
+target: {entity_id: vacuum.re5_plus}
+data: {command: clean_map, params: {map: "Salon salle à manger"}}
+```
+
+`map` accepte le nom ou l'identifiant ; `switch_map` bascule sans lancer.
 
 ### Les états de la carte
 

@@ -60,6 +60,7 @@ DOMAIN_CONSUMABLE: Final = "SweeperConsumable"
 DOMAIN_CLEAN_TASK: Final = "SweeperCleanTask"
 ACTION_CLEAN: Final = "CleanCtrl"
 ACTION_RECHARGE: Final = "RechargeCtrl"
+ACTION_SWITCH_MAP: Final = "SwitchMap"
 SOURCE_MOBILE: Final = "mobile"
 
 # --- Vocabulaire du robot ---------------------------------------------

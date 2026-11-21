@@ -5,7 +5,7 @@ Sources des photos du robot.
 
 **Ces fichiers ne sont pas lus à l'exécution.** La carte ne va chercher
 aucune image : les deux photos sont écrites en base64 directement dans
-`../ezviz-vacuum-card.js`. C'est la seule façon d'être sûr que tout le monde
+`custom_components/ezviz_vacuum/www/ezviz-vacuum-card.js`. C'est la seule façon d'être sûr que tout le monde
 les voie sans rien configurer — y compris quand la carte est servie comme
 ressource « inline », c'est-à-dire une data: URI, sans adresse de base à
 laquelle rattacher un chemin relatif.

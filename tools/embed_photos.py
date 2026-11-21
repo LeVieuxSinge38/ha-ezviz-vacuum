@@ -31,7 +31,7 @@ from pathlib import Path
 from PIL import Image
 
 RACINE = Path(__file__).resolve().parent.parent
-CARTE = RACINE / "cards" / "ezviz-vacuum-card.js"
+CARTE = RACINE / "custom_components" / "ezviz_vacuum" / "www" / "ezviz-vacuum-card.js"
 SOURCES = {
     "EVC_PHOTO_DOCKED": RACINE / "cards" / "images" / "re5-base.png",
     "EVC_PHOTO_MOVING": RACINE / "cards" / "images" / "re5-dessus.png",

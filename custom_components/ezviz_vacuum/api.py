@@ -7,6 +7,7 @@ exécutés dans un thread par le coordinateur.
 from __future__ import annotations
 
 import logging
+import time
 from typing import Any
 
 from pyezvizapi import EzvizClient
@@ -14,6 +15,7 @@ from pyezvizapi import EzvizClient
 from .const import (
     ACTION_CLEAN,
     ACTION_RECHARGE,
+    ACTION_SWITCH_MAP,
     CONSUMABLES,
     DEVICE_CATEGORY,
     DOMAIN_CLEAN_TASK,
@@ -150,3 +152,33 @@ class EzvizVacuumApi:
             ACTION_RECHARGE,
             {"action": action, "source": SOURCE_MOBILE},
         )
+
+    def switch_map(self, serial: str, map_id: int) -> None:
+        """Demande au robot de basculer sur la carte identifiée par `map_id`."""
+        self._action(serial, DOMAIN_MAP, ACTION_SWITCH_MAP, int(map_id))
+
+    def clean_on_map(self, serial: str, map_id: int, timeout: float = 30) -> None:
+        """Bascule sur la carte `map_id` puis lance le nettoyage.
+
+        Attend que la carte devienne active (inUse) en relisant
+        PROP_MAP_BASIC toutes les 2 secondes. Si le délai `timeout` est
+        dépassé avant confirmation, lève une RuntimeError sans démarrer
+        le nettoyage.
+        """
+        self.switch_map(serial, map_id)
+
+        deadline = time.monotonic() + timeout
+        while True:
+            maps = self._read(serial, DOMAIN_MAP, PROP_MAP_BASIC)
+            if isinstance(maps, list):
+                for entry in maps:
+                    if isinstance(entry, dict) and entry.get("mapID") == map_id and entry.get("inUse"):
+                        self.clean(serial, "start")
+                        return
+            if time.monotonic() >= deadline:
+                raise RuntimeError(
+                    f"Timeout : la carte {map_id} n'a pas été confirmée active "
+                    f"avant l'expiration du délai ({timeout} s). "
+                    "Nettoyage non démarré."
+                )
+            time.sleep(2)

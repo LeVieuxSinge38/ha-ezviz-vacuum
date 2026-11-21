@@ -183,6 +183,27 @@ class EzvizVacuum(EzvizVacuumBaseEntity, StateVacuumEntity):
             self.coordinator.api.recharge, self._serial, "start"
         )
 
+    def _map_id(self, valeur: int | str) -> int:
+        """Résout un identifiant de carte à partir d'un int, d'une chaîne
+        numérique, ou d'un nom de carte (insensible à la casse).
+
+        Lève ``ValueError`` si le nom n'est pas trouvé dans les données.
+        """
+        if isinstance(valeur, int):
+            return valeur
+        if isinstance(valeur, str) and valeur.isdigit():
+            return int(valeur)
+        if isinstance(valeur, str):
+            maps = self._data.get("maps")
+            if isinstance(maps, list):
+                for m in maps:
+                    if isinstance(m, dict) and m.get("mapName", "").lower() == valeur.lower():
+                        return m["mapID"]
+        raise ValueError(
+            f"Carte introuvable : {valeur!r} (ni identifiant numérique, "
+            f"ni nom correspondant dans les cartes connues)"
+        )
+
     async def async_send_command(
         self,
         command: str,
@@ -191,8 +212,14 @@ class EzvizVacuum(EzvizVacuumBaseEntity, StateVacuumEntity):
     ) -> None:
         """Passe une commande brute, pour ce que l'entité n'expose pas.
 
-        `clean` accepte start, pause, resume, stop ;
-        `recharge` accepte start et stop.
+        Commandes disponibles :
+
+        - ``clean`` : params ``{"action": "start"|"pause"|"resume"|"stop"}``
+        - ``recharge`` : params ``{"action": "start"|"stop"}``
+        - ``switch_map`` : params ``{"map": <id int ou nom str>}`` —
+          bascule la carte active du robot.
+        - ``clean_map`` : params ``{"map": <id int ou nom str>}`` —
+          lance un nettoyage sur la carte indiquée.
         """
         if command == "clean":
             action = (params or {}).get("action", "start")
@@ -203,6 +230,18 @@ class EzvizVacuum(EzvizVacuumBaseEntity, StateVacuumEntity):
             action = (params or {}).get("action", "start")
             await self.coordinator.async_send(
                 self.coordinator.api.recharge, self._serial, action
+            )
+        elif command == "switch_map":
+            map_id = self._map_id((params or {}).get("map"))
+            await self.coordinator.async_send(
+                self.coordinator.api.switch_map, self._serial, map_id,
+                refresh_slow=True,
+            )
+        elif command == "clean_map":
+            map_id = self._map_id((params or {}).get("map"))
+            await self.coordinator.async_send(
+                self.coordinator.api.clean_on_map, self._serial, map_id,
+                refresh_slow=True,
             )
         else:
             raise ValueError(f"Commande inconnue : {command}")
