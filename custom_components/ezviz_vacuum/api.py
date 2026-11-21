@@ -167,55 +167,5 @@ class EzvizVacuumApi:
         temps d'appliquer la bascule, puis on lance.
         """
         self.switch_map(serial, map_id)
-<<<<<<< HEAD
         time.sleep(pause)
         self.clean(serial, "start")
-
-    # ------------------------------------------------------------------
-    # Diagnostic
-    # ------------------------------------------------------------------
-    def raw_action(self, serial: str, domain: str, action: str, value: Any) -> None:
-        """Envoie une action brute et logge la réponse complète sans lever."""
-        try:
-            response = self._client.set_iot_action(
-                serial, RESOURCE, LOCAL_INDEX, domain, action, value
-            )
-            _LOGGER.warning(
-                "DIAG action %s.%s %r -> %s", domain, action, value, response
-            )
-        except Exception as err:  # noqa: BLE001
-            _LOGGER.warning(
-                "DIAG action %s.%s %r -> EXCEPTION %s", domain, action, value, err
-            )
-
-    def raw_read(self, serial: str, domain: str, prop: str) -> None:
-        """Lit une propriété brute et logge la réponse complète sans lever."""
-        try:
-            response = self._client.get_device_feature_value(
-                serial, RESOURCE, domain, prop, local_index=LOCAL_INDEX
-            )
-            _LOGGER.warning(
-                "DIAG lecture %s.%s -> %s", domain, prop, response
-            )
-        except Exception as err:  # noqa: BLE001
-            _LOGGER.warning(
-                "DIAG lecture %s.%s -> EXCEPTION %s", domain, prop, err
-            )
-=======
-
-        deadline = time.monotonic() + timeout
-        while True:
-            maps = self._read(serial, DOMAIN_MAP, PROP_MAP_BASIC)
-            if isinstance(maps, list):
-                for entry in maps:
-                    if isinstance(entry, dict) and entry.get("mapID") == map_id and entry.get("inUse"):
-                        self.clean(serial, "start")
-                        return
-            if time.monotonic() >= deadline:
-                raise RuntimeError(
-                    f"Timeout : la carte {map_id} n'a pas été confirmée active "
-                    f"avant l'expiration du délai ({timeout} s). "
-                    "Nettoyage non démarré."
-                )
-            time.sleep(2)
->>>>>>> parent of b999732 (Ajouter des commandes de diagnostic brutes (raw_action, raw_read))
