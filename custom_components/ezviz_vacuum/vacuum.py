@@ -220,6 +220,11 @@ class EzvizVacuum(EzvizVacuumBaseEntity, StateVacuumEntity):
           bascule la carte active du robot.
         - ``clean_map`` : params ``{"map": <id int ou nom str>}`` —
           lance un nettoyage sur la carte indiquée.
+        - ``raw_action`` : params ``{"domain": <str>, "action": <str>,
+          "value": <Any>}`` — envoie une action brute sur le domaine
+          indiqué (diagnostic).
+        - ``raw_read`` : params ``{"domain": <str>, "prop": <str>}`` —
+          lit une propriété brute du domaine indiqué (diagnostic).
         """
         if command == "clean":
             action = (params or {}).get("action", "start")
@@ -242,6 +247,20 @@ class EzvizVacuum(EzvizVacuumBaseEntity, StateVacuumEntity):
             await self.coordinator.async_send(
                 self.coordinator.api.clean_on_map, self._serial, map_id,
                 refresh_slow=True,
+            )
+        elif command == "raw_action":
+            domain = (params or {}).get("domain")
+            action = (params or {}).get("action")
+            value = (params or {}).get("value")
+            await self.coordinator.async_send(
+                self.coordinator.api.raw_action, self._serial,
+                domain, action, value, refresh_slow=True,
+            )
+        elif command == "raw_read":
+            domain = (params or {}).get("domain")
+            prop = (params or {}).get("prop")
+            await self.hass.async_add_executor_job(
+                self.coordinator.api.raw_read, self._serial, domain, prop
             )
         else:
             raise ValueError(f"Commande inconnue : {command}")

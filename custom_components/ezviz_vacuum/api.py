@@ -182,3 +182,34 @@ class EzvizVacuumApi:
                     "Nettoyage non démarré."
                 )
             time.sleep(2)
+
+    # ------------------------------------------------------------------
+    # Diagnostic
+    # ------------------------------------------------------------------
+    def raw_action(self, serial: str, domain: str, action: str, value: Any) -> None:
+        """Envoie une action brute et logge la réponse complète sans lever."""
+        try:
+            response = self._client.set_iot_action(
+                serial, RESOURCE, LOCAL_INDEX, domain, action, value
+            )
+            _LOGGER.warning(
+                "DIAG action %s.%s %r -> %s", domain, action, value, response
+            )
+        except Exception as err:  # noqa: BLE001
+            _LOGGER.warning(
+                "DIAG action %s.%s %r -> EXCEPTION %s", domain, action, value, err
+            )
+
+    def raw_read(self, serial: str, domain: str, prop: str) -> None:
+        """Lit une propriété brute et logge la réponse complète sans lever."""
+        try:
+            response = self._client.get_device_feature_value(
+                serial, RESOURCE, domain, prop, local_index=LOCAL_INDEX
+            )
+            _LOGGER.warning(
+                "DIAG lecture %s.%s -> %s", domain, prop, response
+            )
+        except Exception as err:  # noqa: BLE001
+            _LOGGER.warning(
+                "DIAG lecture %s.%s -> EXCEPTION %s", domain, prop, err
+            )
