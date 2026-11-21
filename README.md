@@ -51,8 +51,9 @@ La puissance d'aspiration est exposée en **lecture seule** (capteur
 sur laquelle il se trouve ; quand il se trompe, il en dessine une nouvelle,
 sans les zones interdites. La carte Lovelace affiche donc, à l'arrêt, une
 pastille par carte nommée : un appui bascule le robot sur cette carte
-(`SwitchMap`), attend qu'il la confirme, puis lance le nettoyage. Même chose
-en service :
+(`SwitchMap`), lui laisse trois secondes, puis lance le nettoyage. Vérifié
+sur l'appareil : lancé du salon, il garde la carte du salon et respecte ses
+zones interdites. Même chose en service :
 
 ```yaml
 action: vacuum.send_command
@@ -256,6 +257,10 @@ intercepter son trafic pour la voir.
   répond. Le robot n'expose pas d'API sur le réseau local.
 - **Pas de réglage d'aspiration, d'eau ni de passages, pas de nettoyage par
   pièce** — voir la section précédente.
+- **Le cloud ne dit pas quelle carte est active.** Après `SwitchMap`, le robot
+  accuse réception et change bien de carte, mais `MapBasicProperty.inUse` et
+  `StdCleanCfg.mapID` restent figés — jusqu'à annoncer la cuisine pendant un
+  nettoyage du salon. Ne jamais attendre leur confirmation.
 - **La carte active change toute seule.** Le robot bascule entre ses cartes au
   fil de ses trajets ; un code qui suppose une carte fixe se trompera.
 - **Les pièces s'appellent « Pièce N ».** `RoomBasicProperty`, seule
@@ -333,7 +338,7 @@ Plus de 500 noms essayés pour ces six-là, tous dans `tools/`.
 | `SweeperMapMgr` | `SetCleanCfg` | 20 | `mapID`, `cleanConfigType` |
 | `SweeperMapMgr` | `SetRoomName` | 11 | `mapID`, `roomID`, `roomName` |
 | `SweeperMapMgr` | `SetRoomCustomCleanCfg` | 24 | réglages par pièce — **refuse** |
-| `SweeperMapMgr` | `SwitchMap` | 26 | l'identifiant de carte, en entier nu |
+| `SweeperMapMgr` | `SwitchMap` | 26 | l'identifiant de carte, en entier nu — **fonctionne** |
 
 Les `sid` manquants (1, 2, 4, 5, 7-10, 12-19, 21-23, 25) sont autant d'actions
 qui existent et dont on n'a pas trouvé le nom.

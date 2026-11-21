@@ -167,6 +167,7 @@ class EzvizVacuumApi:
         temps d'appliquer la bascule, puis on lance.
         """
         self.switch_map(serial, map_id)
+<<<<<<< HEAD
         time.sleep(pause)
         self.clean(serial, "start")
 
@@ -200,3 +201,21 @@ class EzvizVacuumApi:
             _LOGGER.warning(
                 "DIAG lecture %s.%s -> EXCEPTION %s", domain, prop, err
             )
+=======
+
+        deadline = time.monotonic() + timeout
+        while True:
+            maps = self._read(serial, DOMAIN_MAP, PROP_MAP_BASIC)
+            if isinstance(maps, list):
+                for entry in maps:
+                    if isinstance(entry, dict) and entry.get("mapID") == map_id and entry.get("inUse"):
+                        self.clean(serial, "start")
+                        return
+            if time.monotonic() >= deadline:
+                raise RuntimeError(
+                    f"Timeout : la carte {map_id} n'a pas été confirmée active "
+                    f"avant l'expiration du délai ({timeout} s). "
+                    "Nettoyage non démarré."
+                )
+            time.sleep(2)
+>>>>>>> parent of b999732 (Ajouter des commandes de diagnostic brutes (raw_action, raw_read))
